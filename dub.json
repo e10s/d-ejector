@@ -7,6 +7,6 @@
 	"dependencies": {
 	},
 	"importPaths-windows": ["."],
-	"libs": ["winmm"],
+	"libs-windows": ["winmm"],
 	"targetType": "library",
 }
