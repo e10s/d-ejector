@@ -1,0 +1,12 @@
+{
+	"name": "d-ejector",
+	"description": "A library to just eject CD/DVD/BD drives.",
+	"copyright": "Copyright (C) 2015, electrolysis",
+	"license": "BSL-1.0",
+	"authors": ["electrolysis"],
+	"dependencies": {
+	},
+	"importPaths-windows": ["."],
+	"libs": ["winmm"],
+	"targetType": "library",
+}
