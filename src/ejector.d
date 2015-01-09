@@ -24,27 +24,37 @@ struct Ejector{
 	}
 */
 	private string drive = "/dev/cdrom";
+	
+	private void logError(string msg, int errNo){
+		debug(Ejector){
+			import core.stdc.string: strerror;
+			import std.conv : text;
+			import std.stdio : stderr, writeln;
 
+			stderr.writeln(msg, ": ", errNo.strerror.text);
+		}
+	}
 	private auto send(Command cmd){
 		import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, fcntl_open = open;
 		import core.sys.posix.sys.ioctl : ioctl;
 		import core.sys.posix.unistd : close;
 		import std.string : toStringz;
+		debug(Ejector) import core.stdc.errno : errno;
+
 		auto fd = fcntl_open(drive.toStringz, O_NONBLOCK | O_RDONLY);
+
 		if(fd == -1){
-			debug(Ejector){
-				import std.stdio;
-				writeln("fcntl_open failed, " ~ drive);
-			}
+			logError("fcntl_open failed, " ~ drive, errno);
 			return false;
 		}
-		if(ioctl(fd, cmd, null) == -1){
-			debug(Ejector){
-				import std.stdio;
-				writeln("ioctl failed, " ~ drive);
-			}
+
+		if(ioctl(fd, cmd) == -1){
+			logError("ioctl failed, " ~ drive, errno);
 			return false;
 		}
+
+		logError("ioctl succeeded, " ~ drive, 0);
+
 		close(fd);
 		return true;
 	}
@@ -74,6 +84,17 @@ struct Ejector{
 		this(cast(string)[driveLetter]);
 	}
 
+	private void logError(string msg, uint errNo){
+		debug(Ejector){
+			import std.conv : text;
+			import std.stdio : stderr, writeln;
+			import win32.mmsystem : mciGetErrorStringA;
+
+			char[512] buf;
+			mciGetErrorStringA(errNo, buf.ptr, buf.length);
+			stderr.writeln(msg, ": ", buf.ptr.text);
+		}
+	}
 	private auto send(string msg){
 		import win32.mmsystem : mciSendString;
 
@@ -88,23 +109,17 @@ struct Ejector{
 
 		auto r = mciSendString(m, null, 0, null);
 
-		debug(Ejector){
-			import std.stdio;
-			import win32.mmsystem : mciGetErrorStringA;
-			char[512] buf;
-			mciGetErrorStringA(r, buf.ptr, buf.length);
-			buf.writeln;
-		}
+		logError(`mciSendString("` ~ msg ~ `") ` ~ (r == 0 ? "succeeded" : "failed"), r);
 
-		return r;
+		return !r;
 	}
 	@property auto ejectable(){
-		return !send("capability cdaudio" ~ drive ~ " can eject");
+		return send("capability cdaudio" ~ drive ~ " can eject");
 	}
 	auto open(){
-		return !!send("set cdaudio" ~ drive ~ " door open");
+		return !send("set cdaudio" ~ drive ~ " door open");
 	}
 	auto closed(){
-		return !!send("set cdaudio" ~ drive ~ " door closed");
+		return !send("set cdaudio" ~ drive ~ " door closed");
 	}
 }
