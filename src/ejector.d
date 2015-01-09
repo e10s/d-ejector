@@ -62,10 +62,10 @@ struct Ejector{
 		return send(Command.CDROM_DRIVE_STATUS);  // not perfect?
 	}
 	auto open(){
-		return !send(Command.CDROMEJECT);
+		return send(Command.CDROMEJECT);
 	}
 	auto closed(){
-		return !send(Command.CDROMCLOSETRAY);
+		return send(Command.CDROMCLOSETRAY);
 	}
 }
 
@@ -117,9 +117,9 @@ struct Ejector{
 		return send("capability cdaudio" ~ drive ~ " can eject");
 	}
 	auto open(){
-		return !send("set cdaudio" ~ drive ~ " door open");
+		return send("set cdaudio" ~ drive ~ " door open");
 	}
 	auto closed(){
-		return !send("set cdaudio" ~ drive ~ " door closed");
+		return send("set cdaudio" ~ drive ~ " door closed");
 	}
 }
