@@ -71,17 +71,47 @@ struct Ejector{
 
 
 version(Windows)
+private auto toStrZ(string s){
+	version(Unicode){
+		import std.utf : toUTF16z;
+		return s.toUTF16z;
+	}
+	else{
+		import std.string : toStringz;
+		return s.toStringz;
+	}
+}
+
+version(Windows)
 struct Ejector{
 	private string drive = "";
 
 	this(string driveLetter){  // "a" to "z" or "A" to "Z"
-		import std.ascii : isAlpha;
+		import std.uni : isAlpha, toUpper;
+
 		if(driveLetter.length == 1 && driveLetter[0].isAlpha){
-			drive = "!" ~ driveLetter;
+			drive = driveLetter.toUpper;
 		}
 	}
 	this(char driveLetter){
 		this(cast(string)[driveLetter]);
+	}
+
+	private @property defaultDrive(){
+		import std.algorithm : find, map;
+		import std.ascii : uppercase;
+		import std.string : toStringz;
+		import win32.winbase : DRIVE_CDROM, GetDriveType;
+
+		auto drives = uppercase.map!(a => (cast(char)a))
+			.find!(a => GetDriveType(toStrZ(a ~ `:\`)) == DRIVE_CDROM);
+		if(drives.empty){
+			return "";
+		}
+		else{
+			import std.conv : text;
+			return drives.front.text;
+		}
 	}
 
 	private void logError(string msg, uint errNo){
@@ -98,28 +128,33 @@ struct Ejector{
 	private auto send(string msg){
 		import win32.mmsystem : mciSendString;
 
-		version(Unicode){
-			import std.utf : toUTF16z;
-			auto m = msg.toUTF16z;
-		}
-		else{
-			import std.string : toStringz;
-			auto m = msg.toStringz;
-		}
-
-		auto r = mciSendString(m, null, 0, null);
+		auto r = mciSendString(msg.toStrZ, null, 0, null);
 
 		logError(`mciSendString("` ~ msg ~ `") ` ~ (r == 0 ? "succeeded" : "failed"), r);
 
 		return !r;
 	}
+	@property auto mciDriveString(){
+		if(drive == ""){
+			auto dd = defaultDrive;
+			if(dd == ""){
+				return "";
+			}
+			else{
+				return "!" ~ dd;
+			}
+		}
+		else{
+			return "!" ~ drive;
+		}
+	}
 	@property auto ejectable(){
-		return send("capability cdaudio" ~ drive ~ " can eject");
+		return send("capability cdaudio" ~ mciDriveString ~ " can eject");
 	}
 	auto open(){
-		return send("set cdaudio" ~ drive ~ " door open");
+		return send("set cdaudio" ~ mciDriveString ~ " door open");
 	}
 	auto closed(){
-		return send("set cdaudio" ~ drive ~ " door closed");
+		return send("set cdaudio" ~ mciDriveString ~ " door closed");
 	}
 }
