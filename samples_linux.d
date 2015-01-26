@@ -9,12 +9,17 @@ void main(){
 	auto e2 = Ejector();
 	e2.open();
 
-	// Search for all ejectable drives and try to get them open/closed.
+	// Search for all ejectable drives and try to toggle open/closed.
 	import std.algorithm, std.stdio, std.typecons;
 	foreach(e; ["/dev/stdin", "/dev/null", "/dev/dvd", "/no/such/device"].
 		map!(a => tuple(a, Ejector(a))).filter!(a => a[1].ejectable)){
 		writeln(e[0] ~ " is ejectable!");
-		e[1].open();  // If e[1] is equivalent to e2 and you have not closed the drive related to it, nothing will occur.
-		e[1].closed();
+		auto status = e[1].status;
+		if(status == TrayStatus.OPEN){
+			e[1].closed();
+		}
+		else if(status == TrayStatus.CLOSED){
+			e[1].open();
+		}
 	}
 }

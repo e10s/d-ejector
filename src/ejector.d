@@ -6,23 +6,27 @@ Distributed under the Boost Software License, Version 1.0.
 
 module ejector;
 
+enum TrayStatus{
+	ERROR, OPEN, CLOSED
+}
+
 version(linux)
 struct Ejector{
-	private enum Command{ /* linux/cdrom.h */
+	private enum Command{  // linux/cdrom.h
 		CDROMEJECT = 0x5309,
 		CDROMCLOSETRAY = 0x5319,
 		CDROM_DRIVE_STATUS = 0x5326,
 		// Other members might be added
 	}
-/*
-	private enum Status{
-		CDS_NO_INFO ,
+
+	private enum Status{  // linux/cdrom.h
+		CDS_NO_INFO,
 		CDS_NO_DISC,
 		CDS_TRAY_OPEN,
 		CDS_DRIVE_NOT_READY,
 		CDS_DISC_OK
 	}
-*/
+
 	private string drive = "/dev/cdrom";
 	
 	private void logError(string msg, int errNo){
@@ -34,29 +38,44 @@ struct Ejector{
 			stderr.writeln(msg, ": ", errNo.strerror.text);
 		}
 	}
-	private auto send(Command cmd){
+	private auto send(Command cmd, ref int sta){
+		import core.stdc.errno : errno;
 		import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, fcntl_open = open;
 		import core.sys.posix.sys.ioctl : ioctl;
 		import core.sys.posix.unistd : close;
 		import std.string : toStringz;
-		debug(Ejector) import core.stdc.errno : errno;
 
 		auto fd = fcntl_open(drive.toStringz, O_NONBLOCK | O_RDONLY);
+		scope(exit) fd != -1 && close(fd);
 
 		if(fd == -1){
 			logError("fcntl_open failed, " ~ drive, errno);
 			return false;
 		}
 
-		if(ioctl(fd, cmd) == -1){
+		sta = ioctl(fd, cmd);
+		if(sta == -1){
 			logError("ioctl failed, " ~ drive, errno);
 			return false;
 		}
 
 		logError("ioctl succeeded, " ~ drive, 0);
 
-		close(fd);
 		return true;
+	}
+	private auto send(Command cmd){
+		int sta;
+		return send(cmd, sta);
+	}
+	@property auto status(){
+		int sta = -1;
+		auto r = send(Command.CDROM_DRIVE_STATUS, sta);
+		if(r && sta != Status.CDS_NO_INFO){
+			return sta == Status.CDS_TRAY_OPEN ? TrayStatus.OPEN : TrayStatus.CLOSED;
+		}
+		else{
+			return TrayStatus.ERROR;
+		}
 	}
 	@property auto ejectable(){
 		return send(Command.CDROM_DRIVE_STATUS);  // not perfect?
@@ -82,6 +101,40 @@ private auto toStrZ(string s){
 	}
 }
 
+version(Windows){
+private:
+	import win32.winioctl;
+	import win32.winbase;
+	import win32.windef;
+
+	// ntddscsi.h
+	struct SCSI_PASS_THROUGH_DIRECT{
+		USHORT Length;
+		UCHAR  ScsiStatus;
+		UCHAR  PathId;
+		UCHAR  TargetId;
+		UCHAR  Lun;
+		UCHAR  CdbLength;
+		UCHAR  SenseInfoLength;
+		UCHAR  DataIn;
+		ULONG  DataTransferLength;
+		ULONG  TimeOutValue;
+		PVOID  DataBuffer;
+		ULONG  SenseInfoOffset;
+		UCHAR  Cdb[16];
+	}
+
+	alias IOCTL_SCSI_BASE = FILE_DEVICE_CONTROLLER;
+	enum IOCTL_SCSI_PASS_THROUGH_DIRECT = CTL_CODE_T!(IOCTL_SCSI_BASE, 0x0405,
+		METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS);
+	enum SCSI_IOCTL_DATA_IN = 1;
+
+
+	// scsi.h
+	enum SCSIOP_MECHANISM_STATUS = UCHAR(0xBD);
+	enum CDB12GENERIC_LENGTH = 12;
+}
+
 version(Windows)
 struct Ejector{
 	private string drive = "";
@@ -97,7 +150,7 @@ struct Ejector{
 		this(cast(string)[driveLetter]);
 	}
 
-	private @property defaultDrive(){
+	private @property auto defaultDrive(){
 		import std.algorithm : find, map;
 		import std.ascii : uppercase;
 		import std.string : toStringz;
@@ -114,14 +167,20 @@ struct Ejector{
 		}
 	}
 
-	private void logError(string msg, uint errNo){
+	private void logError(string msg, uint errNo, bool isMci = true){
 		debug(Ejector){
 			import std.conv : text;
 			import std.stdio : stderr, writeln;
 			import win32.mmsystem : mciGetErrorStringA;
 
 			char[512] buf;
-			mciGetErrorStringA(errNo, buf.ptr, buf.length);
+			if(isMci){
+				mciGetErrorStringA(errNo, buf.ptr, buf.length);
+			}
+			else{
+				FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, null, errNo,
+					MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf.ptr, buf.length, null);
+			}
 			stderr.writeln(msg, ": ", buf.ptr.text);
 		}
 	}
@@ -134,7 +193,7 @@ struct Ejector{
 
 		return !r;
 	}
-	@property auto mciDriveString(){
+	private @property auto mciDriveString(){
 		if(drive == ""){
 			auto dd = defaultDrive;
 			if(dd == ""){
@@ -146,6 +205,54 @@ struct Ejector{
 		}
 		else{
 			return "!" ~ drive;
+		}
+	}
+	@property auto status(){
+		auto drivePath = `\\.\` ~ (drive == "" ? defaultDrive : drive) ~ ":";
+
+		auto h = CreateFile(drivePath.toStrZ, GENERIC_READ | GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
+		scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
+
+		auto err = GetLastError;
+		logError(`CreateFile("` ~ drivePath ~ `") ` ~ (err == 0 ? "succeeded" : "failed"), err, false);
+		if(h == INVALID_HANDLE_VALUE){
+			return TrayStatus.ERROR;
+		}
+
+		auto sptdSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
+		ubyte padding = 255;
+		ubyte[8] buf = padding;  // Mechanism Status Header has 8 bytes
+
+		auto sptd = SCSI_PASS_THROUGH_DIRECT();
+		sptd.Length = sptdSize;
+		sptd.PathId = 0;
+		sptd.TargetId = 1;
+		sptd.CdbLength = 12;
+		sptd.DataIn = SCSI_IOCTL_DATA_IN;
+		sptd.DataTransferLength = buf.length;
+		sptd.TimeOutValue = 5;
+		sptd.DataBuffer = buf.ptr;
+		sptd.Cdb[0] = SCSIOP_MECHANISM_STATUS;
+		sptd.Cdb[9] = buf.length;
+
+		DWORD ret;
+		auto dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,
+			&sptd, sptdSize, &sptd, sptdSize, &ret, null);
+
+		err = GetLastError;
+		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
+
+		debug(Ejector){
+			import std.stdio : stderr, writeln;
+			stderr.writeln(buf);
+		}
+
+		if(!dic || buf[1] == padding){
+			return TrayStatus.ERROR;
+		}
+		else{
+			return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;  // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.728
 		}
 	}
 	@property auto ejectable(){

@@ -9,10 +9,15 @@ void main(){
 	auto e2 = Ejector();
 	e2.open();
 
-	// Search for all ejectable drives and try to get them open/closed.
+	// Search for all ejectable drives and try to toggle open/closed.
 	import std.algorithm, std.ascii;
 	foreach(e; uppercase.map!(a => Ejector(cast(char)a)).filter!(a => a.ejectable)){
-		e.open();  // If e is equivalent to e2 and you have not closed the drive related to it, nothing will occur.
-		e.closed();
+		auto status = e.status;
+		if(status == TrayStatus.OPEN){
+			e.closed();
+		}
+		else if(status == TrayStatus.CLOSED){
+			e.open();
+		}
 	}
 }
