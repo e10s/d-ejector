@@ -16,6 +16,7 @@ struct Ejector{
 		CDROMEJECT = 0x5309,
 		CDROMCLOSETRAY = 0x5319,
 		CDROM_DRIVE_STATUS = 0x5326,
+		CDROM_GET_CAPABILITY = 0x5331, 
 		// Other members might be added
 	}
 
@@ -25,6 +26,11 @@ struct Ejector{
 		CDS_TRAY_OPEN,
 		CDS_DRIVE_NOT_READY,
 		CDS_DISC_OK
+	}
+
+	private enum Capability{
+		CDC_CLOSE_TRAY = 0x1,
+		CDC_OPEN_TRAY = 0x2
 	}
 
 	private string drive = "/dev/cdrom";
@@ -78,7 +84,9 @@ struct Ejector{
 		}
 	}
 	@property auto ejectable(){
-		return send(Command.CDROM_DRIVE_STATUS);  // not perfect?
+		int sta;
+		auto r = send(Command.CDROM_GET_CAPABILITY, sta);
+		return r && (sta & Capability.CDC_OPEN_TRAY);
 	}
 	auto open(){
 		return send(Command.CDROMEJECT);
