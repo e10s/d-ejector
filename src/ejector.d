@@ -255,7 +255,7 @@ struct Ejector{
 			stderr.writeln(buf);
 		}
 
-		if(!dic || buf[1] == padding){
+		if(!dic || sptd.ScsiStatus != 0 || buf[1] == padding){
 			return TrayStatus.ERROR;
 		}
 		else{
