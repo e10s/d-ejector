@@ -234,8 +234,7 @@ struct Ejector{
 
 		auto sptd = SCSI_PASS_THROUGH_DIRECT();
 		sptd.Length = sptdSize;
-		sptd.PathId = 0;
-		sptd.TargetId = 1;
+		// PathId, TargetId and Lun are "don't-care" params: https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
 		sptd.CdbLength = 12;
 		sptd.DataIn = SCSI_IOCTL_DATA_IN;
 		sptd.DataTransferLength = buf.length;
