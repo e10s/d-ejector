@@ -36,7 +36,7 @@ struct Ejector{
 	private string drive = "/dev/cdrom";
 	
 	private void logError(string msg, int errNo){
-		debug(Ejector){
+		debug(VerboseEjector){
 			import core.stdc.string: strerror;
 			import std.conv : text;
 			import std.stdio : stderr, writeln;
@@ -176,7 +176,7 @@ struct Ejector{
 	}
 
 	private void logError(string msg, uint errNo, bool isMci = true){
-		debug(Ejector){
+		debug(VerboseEjector){
 			import std.conv : text;
 			import std.stdio : stderr, writeln;
 			import win32.mmsystem : mciGetErrorStringA;
@@ -250,7 +250,7 @@ struct Ejector{
 		err = GetLastError;
 		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
 
-		debug(Ejector){
+		debug(VerboseEjector){
 			import std.stdio : stderr, writeln;
 			stderr.writeln(buf);
 		}

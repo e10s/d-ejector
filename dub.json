@@ -9,4 +9,13 @@
 	"importPaths-windows": ["."],
 	"libs-windows": ["winmm"],
 	"targetType": "library",
+	"configurations": [
+		{
+			"name": "default",
+		},
+		{
+			"name": "verbose",
+			"debugVersions": ["VerboseEjector"]
+		}
+	]
 }
