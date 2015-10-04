@@ -1,0 +1,5 @@
+name "ejector_example"
+description "A minimal D application."
+copyright "Copyright (C) 2015, electrolysis"
+authors "electrolysis"
+dependency "d-ejector" version="*"
