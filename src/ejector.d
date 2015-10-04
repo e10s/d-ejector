@@ -118,18 +118,18 @@ private:
 	// ntddscsi.h
 	struct SCSI_PASS_THROUGH_DIRECT{
 		USHORT Length;
-		UCHAR  ScsiStatus;
-		UCHAR  PathId;
-		UCHAR  TargetId;
-		UCHAR  Lun;
-		UCHAR  CdbLength;
-		UCHAR  SenseInfoLength;
-		UCHAR  DataIn;
-		ULONG  DataTransferLength;
-		ULONG  TimeOutValue;
-		PVOID  DataBuffer;
-		ULONG  SenseInfoOffset;
-		UCHAR  Cdb[16];
+		UCHAR ScsiStatus;
+		UCHAR PathId;
+		UCHAR TargetId;
+		UCHAR Lun;
+		UCHAR CdbLength;
+		UCHAR SenseInfoLength;
+		UCHAR DataIn;
+		ULONG DataTransferLength;
+		ULONG TimeOutValue;
+		PVOID DataBuffer;
+		ULONG SenseInfoOffset;
+		UCHAR[16] Cdb;
 	}
 
 	alias IOCTL_SCSI_BASE = FILE_DEVICE_CONTROLLER;
