@@ -5,8 +5,8 @@
 	"license": "BSL-1.0",
 	"authors": ["electrolysis"],
 	"dependencies": {
+		"windows-headers": ">=1.0.1"
 	},
-	"importPaths-windows": ["."],
 	"libs-windows": ["winmm"],
 	"targetType": "library",
 	"configurations": [
