@@ -1,0 +1,5 @@
+name "ejector_example"
+description "Example usage of d-ejector."
+copyright "Copyright (C) 2015, electrolysis"
+authors "electrolysis"
+dependency "d-ejector" version="*"

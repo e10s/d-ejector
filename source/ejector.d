@@ -111,9 +111,9 @@ private auto toStrZ(string s){
 
 version(Windows){
 private:
-	import win32.winioctl;
-	import win32.winbase;
-	import win32.windef;
+	import windows.winioctl;
+	import windows.winbase;
+	import windows.windef;
 
 	// ntddscsi.h
 	struct SCSI_PASS_THROUGH_DIRECT{
@@ -162,7 +162,7 @@ struct Ejector{
 		import std.algorithm : find, map;
 		import std.ascii : uppercase;
 		import std.string : toStringz;
-		import win32.winbase : DRIVE_CDROM, GetDriveType;
+		import windows.winbase : DRIVE_CDROM, GetDriveType;
 
 		auto drives = uppercase.map!(a => (cast(char)a))
 			.find!(a => GetDriveType(toStrZ(a ~ `:\`)) == DRIVE_CDROM);
@@ -179,7 +179,7 @@ struct Ejector{
 		debug(VerboseEjector){
 			import std.conv : text;
 			import std.stdio : stderr, writeln;
-			import win32.mmsystem : mciGetErrorStringA;
+			import windows.mmsystem : mciGetErrorStringA;
 
 			char[512] buf;
 			if(isMci){
@@ -193,7 +193,7 @@ struct Ejector{
 		}
 	}
 	private auto send(string msg){
-		import win32.mmsystem : mciSendString;
+		import windows.mmsystem : mciSendString;
 
 		auto r = mciSendString(msg.toStrZ, null, 0, null);
 
