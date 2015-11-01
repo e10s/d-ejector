@@ -10,30 +10,60 @@ enum TrayStatus{
 	ERROR, OPEN, CLOSED
 }
 
-version(linux)
+version(linux){
+	version = Ejector_Posix;
+}
+version(FreeBSD){
+	version = Ejector_Posix;
+}
+
+version(Ejector_Posix)
 struct Ejector{
-	private enum Command{  // linux/cdrom.h
-		CDROMEJECT = 0x5309,
-		CDROMCLOSETRAY = 0x5319,
-		CDROM_DRIVE_STATUS = 0x5326,
-		CDROM_GET_CAPABILITY = 0x5331, 
-		// Other members might be added
+	version(linux){
+		private enum Command{  // linux/cdrom.h
+			CDROMEJECT = 0x5309,
+			CDROMCLOSETRAY = 0x5319,
+			CDROM_DRIVE_STATUS = 0x5326,
+			CDROM_GET_CAPABILITY = 0x5331, 
+			// Other members might be added
+		}
+
+		private enum Status{  // linux/cdrom.h
+			CDS_NO_INFO,
+			CDS_NO_DISC,
+			CDS_TRAY_OPEN,
+			CDS_DRIVE_NOT_READY,
+			CDS_DISC_OK
+		}
+
+		private enum Capability{
+			CDC_CLOSE_TRAY = 0x1,
+			CDC_OPEN_TRAY = 0x2
+		}
+
+		private string drive = "/dev/cdrom";
 	}
 
-	private enum Status{  // linux/cdrom.h
-		CDS_NO_INFO,
-		CDS_NO_DISC,
-		CDS_TRAY_OPEN,
-		CDS_DRIVE_NOT_READY,
-		CDS_DISC_OK
+	version(FreeBSD){
+		// sys/ioccom.h
+		// http://fxr.watson.org/fxr/source/sys/ioccom.h?v=FREEBSD10
+		private enum IOCPARM_SHIFT= 13;
+		private enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
+		private enum IOC_VOID = 0x20000000;
+		private enum _IOC(uint inout_, uint group, uint num, uint len) =
+			uint(inout_ | ((len & IOCPARM_MASK) << 16) | (group << 8) | num);
+		private enum _IO(uint g, uint n) = _IOC!(IOC_VOID, g, n, 0);
+
+		// sys/cdio.h
+		// http://fxr.watson.org/fxr/source/sys/cdio.h?v=FREEBSD10
+		private enum Command{ 
+			CDIOCEJECT = _IO!('c', 24),
+			CDIOCCLOSE = _IO!('c', 28),
+		}
+
+		private string drive = "/dev/cd0";
 	}
 
-	private enum Capability{
-		CDC_CLOSE_TRAY = 0x1,
-		CDC_OPEN_TRAY = 0x2
-	}
-
-	private string drive = "/dev/cdrom";
 	
 	private void logError(string msg, int errNo){
 		debug(VerboseEjector){
@@ -74,25 +104,43 @@ struct Ejector{
 		return send(cmd, sta);
 	}
 	@property auto status(){
-		int sta = -1;
-		auto r = send(Command.CDROM_DRIVE_STATUS, sta);
-		if(r && sta != Status.CDS_NO_INFO){
-			return sta == Status.CDS_TRAY_OPEN ? TrayStatus.OPEN : TrayStatus.CLOSED;
+		version(linux){
+			int sta = -1;
+			auto r = send(Command.CDROM_DRIVE_STATUS, sta);
+			if(r && sta != Status.CDS_NO_INFO){
+				return sta == Status.CDS_TRAY_OPEN ? TrayStatus.OPEN : TrayStatus.CLOSED;
+			}
+			else{
+				return TrayStatus.ERROR;
+			}
 		}
 		else{
-			return TrayStatus.ERROR;
+			assert(0, "'status' is not implemented on this platform.");
+			return false;
 		}
 	}
 	@property auto ejectable(){
-		int sta;
-		auto r = send(Command.CDROM_GET_CAPABILITY, sta);
-		return r && (sta & Capability.CDC_OPEN_TRAY);
+		version(linux){
+			int sta;
+			auto r = send(Command.CDROM_GET_CAPABILITY, sta);
+			return r && (sta & Capability.CDC_OPEN_TRAY);
+		}
+		else{
+			assert(0, "'ejectable' is not implemented on this platform.");
+			return false;
+		}
 	}
 	auto open(){
-		return send(Command.CDROMEJECT);
+		version(linux)
+			return send(Command.CDROMEJECT);
+		version(FreeBSD)
+			return send(Command.CDIOCEJECT);
 	}
 	auto closed(){
-		return send(Command.CDROMCLOSETRAY);
+		version(linux)
+			return send(Command.CDROMCLOSETRAY);
+		version(FreeBSD)
+			return send(Command.CDIOCCLOSE);
 	}
 }
 
