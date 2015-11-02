@@ -318,7 +318,7 @@ struct Ejector{
 			return TrayStatus.ERROR;
 		}
 		else{
-			return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;  // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.728
+			return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;  // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.742
 		}
 	}
 	@property auto ejectable(){
