@@ -19,6 +19,7 @@ version(FreeBSD){
 
 	// get_tray_status_freebsd.c
 	private extern(C) int get_tray_status(const char*, int*);
+	private extern(C) int get_tray_ejectability(const char*, int*);
 }
 
 version(Ejector_Posix)
@@ -123,7 +124,7 @@ struct Ejector{
 			int sta;
 			auto r = get_tray_status(drive.toStringz, &sta) == 0;
 			if(r && sta != TrayStatus.ERROR){
-				return sta;
+				return sta == 1 ? TrayStatus.OPEN : TrayStatus.CLOSED;
 			}
 			else{
 				return TrayStatus.ERROR;
@@ -136,9 +137,11 @@ struct Ejector{
 			auto r = send(Command.CDROM_GET_CAPABILITY, sta);
 			return r && (sta & Capability.CDC_OPEN_TRAY);
 		}
-		else{
-			assert(0, "'ejectable' is not implemented on this platform.");
-			return false;
+		version(FreeBSD){
+			import std.string : toStringz;
+			int sta;
+			auto r = get_tray_ejectability(drive.toStringz, &sta) == 0;
+			return r && sta == 1;
 		}
 	}
 	auto open(){
