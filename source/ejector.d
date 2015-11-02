@@ -15,6 +15,10 @@ version(linux){
 }
 version(FreeBSD){
 	version = Ejector_Posix;
+	pragma(lib, "cam");
+
+	// get_tray_status_freebsd.c
+	private extern(C) int get_tray_status(const char*, int*);
 }
 
 version(Ejector_Posix)
@@ -114,9 +118,16 @@ struct Ejector{
 				return TrayStatus.ERROR;
 			}
 		}
-		else{
-			assert(0, "'status' is not implemented on this platform.");
-			return false;
+		version(FreeBSD){
+			import std.string : toStringz;
+			int sta;
+			auto r = get_tray_status(drive.toStringz, &sta) == 0;
+			if(r && sta != TrayStatus.ERROR){
+				return sta;
+			}
+			else{
+				return TrayStatus.ERROR;
+			}
 		}
 	}
 	@property auto ejectable(){
