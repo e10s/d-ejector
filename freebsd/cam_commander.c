@@ -103,5 +103,14 @@ int get_tray_ejectability(const char* path, int* status){
 
 	*status = get_configuration_response_buf[12] & 0b00001000 ? EJECTABLE : NOT_EJECTABLE;
 
+	// [[ Doubtful ]]
+	// Drives other than ones with caddy/slot type loading mechanism will be closable(?)
+	// http://lxr.free-electrons.com/source/drivers/scsi/sr.c#L890
+	/*
+	if(get_configuration_response_buf[12] >> 5 != 0){
+		// Maybe closable
+	}
+	*/
+
 	return 0;
 }
