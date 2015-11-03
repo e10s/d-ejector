@@ -5,6 +5,9 @@
 	"license": "BSL-1.0",
 	"authors": ["electrolysis"],
 	"libs-windows": ["winmm"],
+	"libs-freebsd": ["cam"],
+	"preBuildCommands-freebsd": ["cd $PACKAGE_DIR/freebsd && cc -c cam_commander.c -o cam_commander.o"],
+	"dflags-freebsd": ["$PACKAGE_DIR/freebsd/cam_commander.o"],
 	"targetType": "library",
 	"configurations": [
 		{
