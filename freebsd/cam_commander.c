@@ -72,7 +72,7 @@ int get_tray_status(const char* path, int* status){
 		mechanism_status_response_buf, MECHANISM_STATUS_RESPONSE_BUF_LEN, status,
 		err_str_buf, ERR_STR_BUF_LEN);
 	
-	if(cc < -1){
+	if(cc < 0){
 		return cc;
 	}
 
@@ -99,7 +99,7 @@ int get_tray_capability(const char* path, int* status){
 		get_configuration_response_buf, GET_CONFIGURATION_RESPONSE_BUF_LEN, status,
 		err_str_buf, ERR_STR_BUF_LEN);
 	
-	if(cc < -1){
+	if(cc < 0){
 		return cc;
 	}
 	
