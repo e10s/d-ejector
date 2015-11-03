@@ -81,12 +81,14 @@ int get_tray_status(const char* path, int* status){
 	return 0;
 }
 
-int get_tray_ejectability(const char* path, int* status){
-	enum Ejectability{
-		ERROR, EJECTABLE, NOT_EJECTABLE
+// ioctl(..., CDIOCCAPABILITY, ...) is dead?
+int get_tray_capability(const char* path, int* status){
+	enum Capability{
+		CDDOEJECT = 0x1,
+		CDDOCLOSE = 0x2
 	};
 
-	*status = ERROR;
+	*status = 0;
 
 	unsigned char get_configuration_cmd [GET_CONFIGURETION_CMD_LEN] =
     	{0x46, 0x02, 0, 0x03, 0, 0, 0, 0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0};
@@ -100,17 +102,18 @@ int get_tray_ejectability(const char* path, int* status){
 	if(cc < -1){
 		return cc;
 	}
-
-	*status = get_configuration_response_buf[12] & 0b00001000 ? EJECTABLE : NOT_EJECTABLE;
-
+	
+	if(get_configuration_response_buf[12] & 0b00001000){
+		*status |= CDDOEJECT;
+	}
+	
 	// [[ Doubtful ]]
 	// Drives other than ones with caddy/slot type loading mechanism will be closable(?)
 	// http://lxr.free-electrons.com/source/drivers/scsi/sr.c#L890
-	/*
 	if(get_configuration_response_buf[12] >> 5 != 0){
 		// Maybe closable
+		*status |= CDDOCLOSE;
 	}
-	*/
 
 	return 0;
 }

@@ -19,7 +19,7 @@ version(FreeBSD){
 
 	// get_tray_status_freebsd.c
 	private extern(C) int get_tray_status(const char*, int*);
-	private extern(C) int get_tray_ejectability(const char*, int*);
+	private extern(C) int get_tray_capability(const char*, int*);
 }
 
 version(Ejector_Posix)
@@ -64,6 +64,12 @@ struct Ejector{
 		private enum Command{ 
 			CDIOCEJECT = _IO!('c', 24),
 			CDIOCCLOSE = _IO!('c', 28),
+		}
+
+		// sys/cdio.h
+		private enum Capability{
+			CDDOEJECT = 0x1,
+			CDDOCLOSE = 0x2
 		}
 
 		private string drive = "/dev/cd0";
@@ -140,8 +146,8 @@ struct Ejector{
 		version(FreeBSD){
 			import std.string : toStringz;
 			int sta;
-			auto r = get_tray_ejectability(drive.toStringz, &sta) == 0;
-			return r && sta == 1;
+			auto r = get_tray_capability(drive.toStringz, &sta) == 0;
+			return r && (sta & Capability.CDDOEJECT);
 		}
 	}
 	auto open(){
