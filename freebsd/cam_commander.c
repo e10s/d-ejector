@@ -89,7 +89,7 @@ int get_tray_ejectability(const char* path, int* status){
 	*status = ERROR;
 
 	unsigned char get_configuration_cmd [GET_CONFIGURETION_CMD_LEN] =
-    	{0x46, 0, 0, 0x03, 0, 0, 0, 0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0};
+    	{0x46, 0x02, 0, 0x03, 0, 0, 0, 0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0};
 	unsigned char get_configuration_response_buf[GET_CONFIGURATION_RESPONSE_BUF_LEN];
 	char err_str_buf[ERR_STR_BUF_LEN];
 
