@@ -93,7 +93,7 @@ int get_tray_capability(const char* path, int* status, char* err_str_buf, const 
 	*status = 0;
 
 	static const unsigned char get_configuration_cmd [GET_CONFIGURETION_CMD_LEN] =
-    	{0x46, 0x00, 0, 0x03, 0, 0, 0, 0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0};
+    	{0x46, 0x02, 0, 0x03, 0, 0, 0, 0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0};
 	unsigned char get_configuration_response_buf[GET_CONFIGURATION_RESPONSE_BUF_LEN];
 
 	int cc = _cam_commander(path, get_configuration_cmd, GET_CONFIGURETION_CMD_LEN,
