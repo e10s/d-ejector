@@ -17,9 +17,9 @@ version(FreeBSD){
 	version = Ejector_Posix;
 	pragma(lib, "cam");
 
-	// get_tray_status_freebsd.c
-	private extern(C) int get_tray_status(const char*, int*);
-	private extern(C) int get_tray_capability(const char*, int*);
+	// cam_commander.c
+	private extern(C) int get_tray_status(const char*, int*, char*, const int);
+	private extern(C) int get_tray_capability(const char*, int*, char*, const int);
 }
 
 version(Ejector_Posix)
@@ -50,8 +50,12 @@ struct Ejector{
 	}
 
 	version(FreeBSD){
+		// camlib.h
+		// https://github.com/freebsd/freebsd/blob/master/lib/libcam/camlib.h
+		private enum CAM_ERRBUF_SIZE = 2048;
+
 		// sys/ioccom.h
-		// http://fxr.watson.org/fxr/source/sys/ioccom.h?v=FREEBSD10
+		// https://github.com/freebsd/freebsd/blob/master/sys/sys/ioccom.h
 		private enum IOCPARM_SHIFT= 13;
 		private enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
 		private enum IOC_VOID = 0x20000000;
@@ -60,7 +64,7 @@ struct Ejector{
 		private enum _IO(uint g, uint n) = _IOC!(IOC_VOID, g, n, 0);
 
 		// sys/cdio.h
-		// http://fxr.watson.org/fxr/source/sys/cdio.h?v=FREEBSD10
+		// https://github.com/freebsd/freebsd/blob/master/sys/sys/cdio.h
 		private enum Command{ 
 			CDIOCEJECT = _IO!('c', 24),
 			CDIOCCLOSE = _IO!('c', 28),
@@ -128,11 +132,22 @@ struct Ejector{
 		version(FreeBSD){
 			import std.string : toStringz;
 			int sta;
-			auto r = get_tray_status(drive.toStringz, &sta) == 0;
+			auto buf = new char[CAM_ERRBUF_SIZE];
+			buf[] = '\0';
+			auto r = get_tray_status(drive.toStringz, &sta, buf.ptr, CAM_ERRBUF_SIZE) == 0;
 			if(r && sta != TrayStatus.ERROR){
+				debug(VerboseEjector){
+					import std.stdio : stderr, writeln;
+					stderr.writeln("get_tray_status succeeded");
+				}
 				return sta == 1 ? TrayStatus.OPEN : TrayStatus.CLOSED;
 			}
 			else{
+				debug(VerboseEjector){
+					import std.conv : text;
+					import std.stdio : stderr, writeln;
+					stderr.writeln("get_tray_status failed,\n", buf.text);
+				}
 				return TrayStatus.ERROR;
 			}
 		}
@@ -146,7 +161,19 @@ struct Ejector{
 		version(FreeBSD){
 			import std.string : toStringz;
 			int sta;
-			auto r = get_tray_capability(drive.toStringz, &sta) == 0;
+			auto buf = new char[CAM_ERRBUF_SIZE];
+			buf[] = '\0';
+			auto r = get_tray_capability(drive.toStringz, &sta, buf.ptr, CAM_ERRBUF_SIZE) == 0;
+			debug(VerboseEjector){
+				import std.stdio : stderr, writeln;
+				if(r){
+					stderr.writeln("get_tray_capability succeeded");
+				}
+				else{
+					import std.conv : text;
+					stderr.writeln("get_tray_capability failed,\n", buf.text);
+				}
+			}
 			return r && (sta & Capability.CDDOEJECT);
 		}
 	}
