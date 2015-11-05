@@ -350,7 +350,6 @@ struct Ejector
         {
             import std.conv : text;
             import std.stdio : stderr, writeln;
-            import windows.mmsystem : mciGetErrorStringA;
 
             char[512] buf;
             FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, null, errNo,
