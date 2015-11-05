@@ -297,37 +297,9 @@ struct Ejector{
 			import windows.mmsystem : mciGetErrorStringA;
 
 			char[512] buf;
-			if(isMci){
-				mciGetErrorStringA(errNo, buf.ptr, buf.length);
-			}
-			else{
-				FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, null, errNo,
-					MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf.ptr, buf.length, null);
-			}
+			FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, null, errNo,
+				MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf.ptr, buf.length, null);
 			stderr.writeln(msg, ": ", buf.ptr.text);
-		}
-	}
-	private auto send(string msg){
-		import windows.mmsystem : mciSendString;
-
-		auto r = mciSendString(msg.toStrZ, null, 0, null);
-
-		logError(`mciSendString("` ~ msg ~ `") ` ~ (r == 0 ? "succeeded" : "failed"), r);
-
-		return !r;
-	}
-	private @property auto mciDriveString(){
-		if(drive == ""){
-			auto dd = defaultDrive;
-			if(dd == ""){
-				return "";
-			}
-			else{
-				return "!" ~ dd;
-			}
-		}
-		else{
-			return "!" ~ drive;
 		}
 	}
 	private auto createDriveHandle(){
@@ -422,9 +394,37 @@ struct Ejector{
 		*/
 	}
 	auto open(){
-		return send("set cdaudio" ~ mciDriveString ~ " door open");
+		auto h = createDriveHandle();
+		scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
+
+		if(h == INVALID_HANDLE_VALUE){
+			return false;
+		}
+
+		DWORD ret;
+		auto dic = DeviceIoControl(h, IOCTL_STORAGE_EJECT_MEDIA,
+			null, 0, null, 0, &ret, null);
+		auto err = GetLastError;
+		import std.stdio;writeln(dic);
+		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
+
+		return !!dic;
 	}
 	auto closed(){
-		return send("set cdaudio" ~ mciDriveString ~ " door closed");
+		auto h = createDriveHandle();
+		scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
+
+		if(h == INVALID_HANDLE_VALUE){
+			return false;
+		}
+
+		DWORD ret;
+		auto dic = DeviceIoControl(h, IOCTL_STORAGE_LOAD_MEDIA,
+			null, 0, null, 0, &ret, null);
+		auto err = GetLastError;
+		import std.stdio;writeln(dic);
+		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
+
+		return !!dic;
 	}
 }
