@@ -4,7 +4,7 @@
 	"copyright": "Copyright (C) 2015, electrolysis",
 	"license": "BSL-1.0",
 	"authors": ["electrolysis"],
-	"dependencies": {
+	"dependencies-windows": {
 		"windows-headers": ">=1.0.1"
 	},
 	"libs-windows": ["winmm"],
