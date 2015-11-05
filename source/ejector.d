@@ -290,7 +290,7 @@ struct Ejector{
 		}
 	}
 
-	private void logError(string msg, uint errNo, bool isMci = true){
+	private void logError(string msg, uint errNo){
 		debug(VerboseEjector){
 			import std.conv : text;
 			import std.stdio : stderr, writeln;
@@ -309,7 +309,7 @@ struct Ejector{
 			FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
 
 		auto err = GetLastError;
-		logError(`CreateFile("` ~ drivePath ~ `") ` ~ (err == 0 ? "succeeded" : "failed"), err, false);
+		logError(`CreateFile("` ~ drivePath ~ `") ` ~ (err == 0 ? "succeeded" : "failed"), err);
 
 		return h;
 	}
@@ -341,7 +341,7 @@ struct Ejector{
 			&sptd, sptdSize, &sptd, sptdSize, &ret, null);
 
 		auto err = GetLastError;
-		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
+		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err);
 
 		debug(VerboseEjector){
 			import std.stdio : stderr, writeln;
@@ -375,7 +375,7 @@ struct Ejector{
 		auto dic = DeviceIoControl(h, IOCTL_CDROM_GET_CONFIGURATION,
 			&gcii, gciiSize, buf.ptr, bufSize, &ret, null);
 		auto err = GetLastError;
-		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
+		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err);
 
 		debug(VerboseEjector){
 			import std.stdio : stderr, writeln;
@@ -393,7 +393,7 @@ struct Ejector{
 		}
 		*/
 	}
-	auto open(){
+	auto opDispatch(string s)() if(s == "open" || s == "closed"){
 		auto h = createDriveHandle();
 		scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
 
@@ -402,28 +402,12 @@ struct Ejector{
 		}
 
 		DWORD ret;
-		auto dic = DeviceIoControl(h, IOCTL_STORAGE_EJECT_MEDIA,
+		enum cmd = s == "open" ? IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
+		auto dic = DeviceIoControl(h, cmd,
 			null, 0, null, 0, &ret, null);
 		auto err = GetLastError;
 		import std.stdio;writeln(dic);
-		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
-
-		return !!dic;
-	}
-	auto closed(){
-		auto h = createDriveHandle();
-		scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
-
-		if(h == INVALID_HANDLE_VALUE){
-			return false;
-		}
-
-		DWORD ret;
-		auto dic = DeviceIoControl(h, IOCTL_STORAGE_LOAD_MEDIA,
-			null, 0, null, 0, &ret, null);
-		auto err = GetLastError;
-		import std.stdio;writeln(dic);
-		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
+		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err);
 
 		return !!dic;
 	}
