@@ -4,6 +4,9 @@
 	"copyright": "Copyright (C) 2015, electrolysis",
 	"license": "BSL-1.0",
 	"authors": ["electrolysis"],
+	"dependencies": {
+		"windows-headers": ">=1.0.1"
+	},
 	"libs-windows": ["winmm"],
 	"libs-freebsd": ["cam"],
 	"preBuildCommands-freebsd": ["cd $PACKAGE_DIR/freebsd && cc -c cam_commander.c -o cam_commander.o"],
