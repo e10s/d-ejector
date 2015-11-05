@@ -236,6 +236,26 @@ private:
 	// scsi.h
 	enum SCSIOP_MECHANISM_STATUS = UCHAR(0xBD);
 	enum CDB12GENERIC_LENGTH = 12;
+
+
+	// ntddmmc.h
+	enum FEATURE_NUMBER{
+		FeatureRemovableMedium = 0x0003
+	}
+
+	enum SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE = 0x2;
+
+	struct GET_CONFIGURATION_IOCTL_INPUT{
+		FEATURE_NUMBER Feature;
+		ULONG RequestType;
+		PVOID[2] Reserved;
+	}
+
+
+	//ntddcdrm.h
+	alias IOCTL_CDROM_BASE = FILE_DEVICE_CD_ROM;
+	enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
+		METHOD_BUFFERED, FILE_READ_ACCESS);
 }
 
 version(Windows)
@@ -310,15 +330,21 @@ struct Ejector{
 			return "!" ~ drive;
 		}
 	}
-	@property auto status(){
+	private auto createDriveHandle(){
 		auto drivePath = `\\.\` ~ (drive == "" ? defaultDrive : drive) ~ ":";
 
 		auto h = CreateFile(drivePath.toStrZ, GENERIC_READ | GENERIC_WRITE,
 			FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
-		scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
 
 		auto err = GetLastError;
 		logError(`CreateFile("` ~ drivePath ~ `") ` ~ (err == 0 ? "succeeded" : "failed"), err, false);
+
+		return h;
+	}
+	@property auto status(){
+		auto h = createDriveHandle();
+		scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
+
 		if(h == INVALID_HANDLE_VALUE){
 			return TrayStatus.ERROR;
 		}
@@ -342,7 +368,7 @@ struct Ejector{
 		auto dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,
 			&sptd, sptdSize, &sptd, sptdSize, &ret, null);
 
-		err = GetLastError;
+		auto err = GetLastError;
 		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
 
 		debug(VerboseEjector){
@@ -358,7 +384,42 @@ struct Ejector{
 		}
 	}
 	@property auto ejectable(){
-		return send("capability cdaudio" ~ mciDriveString ~ " can eject");
+		auto h = createDriveHandle();
+		scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
+
+		if(h == INVALID_HANDLE_VALUE){
+			return false;
+		}
+
+		auto gciiSize = USHORT(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
+		enum bufSize = 16;  // Response has 16 bytes (header + descriptor)
+		ubyte[bufSize] buf;
+
+		auto gcii = GET_CONFIGURATION_IOCTL_INPUT();
+		gcii.Feature = FEATURE_NUMBER. FeatureRemovableMedium;
+		gcii.RequestType = SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE;
+
+		DWORD ret;
+		auto dic = DeviceIoControl(h, IOCTL_CDROM_GET_CONFIGURATION,
+			&gcii, gciiSize, buf.ptr, bufSize, &ret, null);
+		auto err = GetLastError;
+		logError("DeviceIoControl() " ~ (err == 0 ? "succeeded" : "failed"), err, false);
+
+		debug(VerboseEjector){
+			import std.stdio : stderr, writeln;
+			stderr.writeln(buf);
+		}
+
+		return dic && !!(buf[12] & 0b00001000);  // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
+
+		// [[ Doubtful ]]
+		// Drives other than ones with caddy/slot type loading mechanism will be closable(?)
+		// https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
+		/*
+		if(buf[12] >> 5 != 0){
+			// Maybe closable
+		}
+		*/
 	}
 	auto open(){
 		return send("set cdaudio" ~ mciDriveString ~ " door open");
