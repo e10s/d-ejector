@@ -107,17 +107,17 @@ struct Ejector
     private auto send(Command cmd, ref int sta)
     {
         import core.stdc.errno : errno;
-        import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, fcntl_open = open;
+        import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, open;
         import core.sys.posix.sys.ioctl : ioctl;
         import core.sys.posix.unistd : close;
         import std.string : toStringz;
 
-        auto fd = fcntl_open(drive.toStringz, O_NONBLOCK | O_RDONLY);
+        auto fd = open(drive.toStringz, O_NONBLOCK | O_RDONLY);
         scope(exit) fd != -1 && close(fd);
 
         if (fd == -1)
         {
-            logError("fcntl_open failed, " ~ drive, errno);
+            logError("open failed, " ~ drive, errno);
             return false;
         }
 
