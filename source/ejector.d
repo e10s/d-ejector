@@ -19,13 +19,16 @@ version(linux)
 
 version(linux) private
 {
-    // linux/cdrom.h
     enum Command
     {
+        // scsi/sg.h
+        SG_IO = 0x2285,
+
+        // linux/cdrom.h
         CDROMEJECT = 0x5309,
         CDROMCLOSETRAY = 0x5319,
         CDROM_DRIVE_STATUS = 0x5326,
-        CDROM_GET_CAPABILITY = 0x5331, 
+        CDROM_GET_CAPABILITY = 0x5331,
         // Other members might be added
     }
 
@@ -44,6 +47,36 @@ version(linux) private
         CDC_CLOSE_TRAY = 0x1,
         CDC_OPEN_TRAY = 0x2
     }
+
+    // scsi/sg.h
+    struct sg_io_hdr
+    {
+        int interface_id;
+        int dxfer_direction;
+        ubyte cmd_len;
+        ubyte mx_sb_len;
+        ushort iovec_count;
+        uint dxfer_len;
+        void* dxferp;
+        ubyte* cmdp;
+        void* sbp;
+        uint timeout;
+        uint flags;
+        int pack_id;
+        void* usr_ptr;
+        ubyte status;
+        ubyte masked_status;
+        ubyte msg_status;
+        ubyte sb_len_wr;
+        ushort host_status;
+        ushort driver_status;
+        int resid;
+        uint duration;
+        uint info;
+    }
+
+    enum SG_INTERFACE_ID_ORIG = 'S';
+    enum SG_DXFER_FROM_DEV = -3;
 }
 
 
@@ -75,7 +108,7 @@ version(FreeBSD) private
     // sys/cdio.h
     // https://github.com/freebsd/freebsd/blob/master/sys/sys/cdio.h
     enum Command
-    { 
+    {
         CDIOCEJECT = _IO!('c', 24),
         CDIOCCLOSE = _IO!('c', 28),
     }
@@ -102,7 +135,7 @@ struct Ejector
         private string drive = "/dev/cd0";
     }
 
-    
+
     private void logError(string msg, int errNo)
     {
         debug(VerboseEjector)
@@ -114,7 +147,7 @@ struct Ejector
             stderr.writeln(msg, ": ", errNo.strerror.text);
         }
     }
-    private auto send(Command cmd, ref int sta)
+    private auto send(T)(Command cmd, ref int sta, T third)
     {
         import core.stdc.errno : errno;
         import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, open;
@@ -131,7 +164,7 @@ struct Ejector
             return false;
         }
 
-        sta = ioctl(fd, cmd);
+        sta = ioctl(fd, cmd, third);
         if (sta == -1)
         {
             logError("ioctl failed, " ~ drive, errno);
@@ -141,6 +174,10 @@ struct Ejector
         logError("ioctl succeeded, " ~ drive, 0);
 
         return true;
+    }
+    private auto send(Command cmd, ref int sta)
+    {
+        return send(cmd, sta, 0);
     }
     private auto send(Command cmd)
     {
@@ -196,9 +233,70 @@ struct Ejector
     {
         version(linux)
         {
+            enum GET_CONFIGURATION_CMD_LEN = 12;
+            enum GET_CONFIGURATION_RESPONSE_BUF_LEN = 16;
+
+            auto buf = new ubyte[GET_CONFIGURATION_RESPONSE_BUF_LEN];
+            static immutable ubyte[GET_CONFIGURATION_CMD_LEN]
+                get_configuration_cmd =
+                [0x46, 0x02, 0, 0x03, 0, 0, 0, 0, 16, 0, 0, 0];
+
+            auto hdr = sg_io_hdr();
+            with (hdr)
+            {
+                interface_id = SG_INTERFACE_ID_ORIG;
+                dxfer_direction = SG_DXFER_FROM_DEV;
+                cmd_len = GET_CONFIGURATION_CMD_LEN;
+                dxfer_len = GET_CONFIGURATION_RESPONSE_BUF_LEN;
+                dxferp = buf.ptr;
+                cmdp = cast(ubyte*)get_configuration_cmd.ptr;
+                sbp = null;
+                timeout = 5000;
+            }
+
             int sta;
-            auto r = send(Command.CDROM_GET_CAPABILITY, sta);
-            return r && (sta & Capability.CDC_OPEN_TRAY);
+            auto r = send(Command.SG_IO, sta, &hdr);
+
+            int cap;
+
+            if (r)
+            {
+                // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
+                // Test the Eject bit
+                auto eject = buf[12] & 0b00001000;
+                if (eject)
+                {
+                    cap |= Capability.CDC_OPEN_TRAY;
+                }
+
+                // The Loading Mechanism Type field
+                auto mech = buf[12] >> 5;
+
+                // Test the Version field and the Load bit
+                auto version_ = (buf[10] >> 2) & 0b00001111;
+                auto load = buf[12] & 0b00010000;
+                if (version_ > 0 && load)
+                {
+                    cap |= Capability.CDC_CLOSE_TRAY;
+                }
+                // [[ Doubtful ]]
+                // Guess from the Loading Mechanism Type field
+                // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
+                // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
+                else if (mech != 0)
+                {
+                    // Maybe closable
+                    cap |= Capability.CDC_CLOSE_TRAY;
+                }
+            }
+            /*
+            else
+            {
+                // We might have to execute MODE SENSE (10)
+            }
+            */
+
+            return r && (cap & Capability.CDC_OPEN_TRAY);
         }
         version(FreeBSD)
         {
@@ -485,7 +583,7 @@ struct Ejector
         // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
         // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
         /*
-        else if (version_ != 0)
+        else if (mech != 0)
         {
             // Maybe closable
         }
