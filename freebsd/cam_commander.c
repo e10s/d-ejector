@@ -15,7 +15,7 @@ Distributed under the Boost Software License, Version 1.0.
 #define MECHANISM_STATUS_CMD_LEN 12
 #define MECHANISM_STATUS_RESPONSE_BUF_LEN 8
 
-#define GET_CONFIGURETION_CMD_LEN 12
+#define GET_CONFIGURATION_CMD_LEN 12
 #define GET_CONFIGURATION_RESPONSE_BUF_LEN 16
 
 int _cam_commander(const char* path, const unsigned char* cmd,
@@ -110,11 +110,11 @@ int get_tray_capability(const char* path, int* status,
 
     *status = 0;
 
-    static const unsigned char get_configuration_cmd[GET_CONFIGURETION_CMD_LEN] =
+    static const unsigned char get_configuration_cmd[GET_CONFIGURATION_CMD_LEN] =
         {0x46, 0x02, 0, 0x03, 0, 0, 0, 0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0};
     unsigned char get_configuration_response_buf[GET_CONFIGURATION_RESPONSE_BUF_LEN];
 
-    int cc = _cam_commander(path, get_configuration_cmd, GET_CONFIGURETION_CMD_LEN,
+    int cc = _cam_commander(path, get_configuration_cmd, GET_CONFIGURATION_CMD_LEN,
         get_configuration_response_buf, GET_CONFIGURATION_RESPONSE_BUF_LEN, status,
         err_str_buf, err_str_buf_len);
     
