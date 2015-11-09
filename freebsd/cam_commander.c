@@ -120,18 +120,32 @@ int get_tray_capability(const char* path, int* status,
     
     if (cc < 0)
     {
+        // We might have to execute MODE SENSE (10)
         return cc;
     }
-    
-    if (get_configuration_response_buf[12] & 0b00001000)
+
+    // Test the Eject bit
+    int eject = get_configuration_response_buf[12] & 0b00001000;
+    if (eject)
     {
         *status |= CDDOEJECT;
     }
-    
+
+    // The Loading Mechanism Type field
+    int mech = get_configuration_response_buf[12] >> 5;
+
+    // Test the Version field and the Load bit
+    int version = (get_configuration_response_buf[10] >> 2) & 0b00001111;
+    int load = get_configuration_response_buf[12] & 0b00010000;
+    if (version > 0 && load)
+    {
+        *status |= CDDOCLOSE;
+    }
     // [[ Doubtful ]]
+    // Guess from the Loading Mechanism Type field
     // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
     // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-    if (get_configuration_response_buf[12] >> 5 != 0)
+    else if (mech != 0)
     {
         // Maybe closable
         *status |= CDDOCLOSE;
