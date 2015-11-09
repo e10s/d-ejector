@@ -453,13 +453,28 @@ struct Ejector
         }
 
         // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
-        return dic && !!(buf[12] & 0b00001000);
+        // Test the Eject bit
+        auto eject = !!(buf[12] & 0b00001000);
+        // If dic fails, we might have to execute MODE SENSE (10)
+        return dic && eject;
 
+        // The Loading Mechanism Type field
+        // auto mech = buf[12] >> 5;
+
+        // Test the Version field and the Load bit
+        /*
+        auto version_ = (buf[10] >> 2) & 0b00001111;
+        auto load = !!(buf[12] & 0b00010000);
+        if (version_ > 0 && load)
+        {
+            // Closable
+        }
+        */
         // [[ Doubtful ]]
         // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
         // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
         /*
-        if (buf[12] >> 5 != 0)
+        else if (version_ != 0)
         {
             // Maybe closable
         }
