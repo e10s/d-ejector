@@ -11,84 +11,94 @@ enum TrayStatus
     ERROR, OPEN, CLOSED
 }
 
+
 version(linux)
 {
     version = Ejector_Posix;
 }
+
+version(linux) private
+{
+    // linux/cdrom.h
+    enum Command
+    {
+        CDROMEJECT = 0x5309,
+        CDROMCLOSETRAY = 0x5319,
+        CDROM_DRIVE_STATUS = 0x5326,
+        CDROM_GET_CAPABILITY = 0x5331, 
+        // Other members might be added
+    }
+
+    // linux/cdrom.h
+    enum Status
+    {
+        CDS_NO_INFO,
+        CDS_NO_DISC,
+        CDS_TRAY_OPEN,
+        CDS_DRIVE_NOT_READY,
+        CDS_DISC_OK
+    }
+
+    enum Capability
+    {
+        CDC_CLOSE_TRAY = 0x1,
+        CDC_OPEN_TRAY = 0x2
+    }
+}
+
+
 version(FreeBSD)
 {
     version = Ejector_Posix;
     pragma(lib, "cam");
-
-    // cam_commander.c
-    private extern(C) int get_tray_status(const char*, int*, char*, const int);
-    private extern(C) int get_tray_capability(const char*, int*, char*, const int);
 }
+
+version(FreeBSD) private
+{
+    // cam_commander.c
+    extern(C) int get_tray_status(const char*, int*, char*, const int);
+    extern(C) int get_tray_capability(const char*, int*, char*, const int);
+
+    // camlib.h
+    // https://github.com/freebsd/freebsd/blob/master/lib/libcam/camlib.h
+    enum CAM_ERRBUF_SIZE = 2048;
+
+    // sys/ioccom.h
+    // https://github.com/freebsd/freebsd/blob/master/sys/sys/ioccom.h
+    enum IOCPARM_SHIFT= 13;
+    enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
+    enum IOC_VOID = 0x20000000;
+    enum _IOC(uint inout_, uint group, uint num, uint len) =
+        uint(inout_ | ((len & IOCPARM_MASK) << 16) | (group << 8) | num);
+    enum _IO(uint g, uint n) = _IOC!(IOC_VOID, g, n, 0);
+
+    // sys/cdio.h
+    // https://github.com/freebsd/freebsd/blob/master/sys/sys/cdio.h
+    enum Command
+    { 
+        CDIOCEJECT = _IO!('c', 24),
+        CDIOCCLOSE = _IO!('c', 28),
+    }
+
+    // sys/cdio.h
+    enum Capability
+    {
+        CDDOEJECT = 0x1,
+        CDDOCLOSE = 0x2
+    }
+}
+
 
 version(Ejector_Posix)
 struct Ejector
 {
     version(linux)
     {
-        // linux/cdrom.h
-        private enum Command
-        {
-            CDROMEJECT = 0x5309,
-            CDROMCLOSETRAY = 0x5319,
-            CDROM_DRIVE_STATUS = 0x5326,
-            CDROM_GET_CAPABILITY = 0x5331, 
-            // Other members might be added
-        }
-
-        // linux/cdrom.h
-        private enum Status
-        {
-            CDS_NO_INFO,
-            CDS_NO_DISC,
-            CDS_TRAY_OPEN,
-            CDS_DRIVE_NOT_READY,
-            CDS_DISC_OK
-        }
-
-        private enum Capability
-        {
-            CDC_CLOSE_TRAY = 0x1,
-            CDC_OPEN_TRAY = 0x2
-        }
-
         private string drive = "/dev/cdrom";
     }
 
     version(FreeBSD)
     {
-        // camlib.h
-        // https://github.com/freebsd/freebsd/blob/master/lib/libcam/camlib.h
-        private enum CAM_ERRBUF_SIZE = 2048;
-
-        // sys/ioccom.h
-        // https://github.com/freebsd/freebsd/blob/master/sys/sys/ioccom.h
-        private enum IOCPARM_SHIFT= 13;
-        private enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
-        private enum IOC_VOID = 0x20000000;
-        private enum _IOC(uint inout_, uint group, uint num, uint len) =
-            uint(inout_ | ((len & IOCPARM_MASK) << 16) | (group << 8) | num);
-        private enum _IO(uint g, uint n) = _IOC!(IOC_VOID, g, n, 0);
-
-        // sys/cdio.h
-        // https://github.com/freebsd/freebsd/blob/master/sys/sys/cdio.h
-        private enum Command
-        { 
-            CDIOCEJECT = _IO!('c', 24),
-            CDIOCCLOSE = _IO!('c', 28),
-        }
-
-        // sys/cdio.h
-        private enum Capability
-        {
-            CDDOEJECT = 0x1,
-            CDDOCLOSE = 0x2
-        }
-
         private string drive = "/dev/cd0";
     }
 
@@ -231,24 +241,24 @@ struct Ejector
 }
 
 
-version(Windows)
-private auto toStrZ(string s)
-{
-    version(Unicode)
-    {
-        import std.utf : toUTF16z;
-        return s.toUTF16z;
-    }
-    else
-    {
-        import std.string : toStringz;
-        return s.toStringz;
-    }
-}
 
-version(Windows)
+version(Windows) private
 {
-private:
+    auto toStrZ(string s)
+    {
+        version(Unicode)
+        {
+            import std.utf : toUTF16z;
+            return s.toUTF16z;
+        }
+        else
+        {
+            import std.string : toStringz;
+            return s.toStringz;
+        }
+    }
+
+
     import windows.winioctl;
     import windows.winbase;
     import windows.windef;
@@ -303,6 +313,7 @@ private:
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
         METHOD_BUFFERED, FILE_READ_ACCESS);
 }
+
 
 version(Windows)
 struct Ejector
