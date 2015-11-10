@@ -11,6 +11,7 @@ Distributed under the Boost Software License, Version 1.0.
 #include <camlib.h> // requires -lcam
 
 #include <cam/scsi/scsi_message.h> // MSG_SIMPLE_Q_TAG
+#include <sys/cdio.h>
 
 #define MECHANISM_STATUS_CMD_LEN 12
 #define MECHANISM_STATUS_RESPONSE_BUF_LEN 8
@@ -102,12 +103,6 @@ int get_tray_status(const char* path, int* status,
 int get_tray_capability(const char* path, int* status,
     char* err_str_buf, const int err_str_buf_len)
 {
-    enum Capability
-    {
-        CDDOEJECT = 0x1,
-        CDDOCLOSE = 0x2
-    };
-
     *status = 0;
 
     static const unsigned char get_configuration_cmd[GET_CONFIGURATION_CMD_LEN] =
