@@ -604,7 +604,7 @@ struct Ejector
             IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
         auto dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
         auto err = GetLastError;
-        import std.stdio;writeln(dic);
+
         logError("DeviceIoControl() " ~
             (err == 0 ? "succeeded" : "failed"), err);
 
