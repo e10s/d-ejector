@@ -155,7 +155,7 @@ struct Ejector
         import core.sys.posix.unistd : close;
         import std.string : toStringz;
 
-        auto fd = open(drive.toStringz, O_NONBLOCK | O_RDONLY);
+        immutable fd = open(drive.toStringz, O_NONBLOCK | O_RDONLY);
         scope(exit) fd != -1 && close(fd);
 
         if (fd == -1)
@@ -189,7 +189,7 @@ struct Ejector
         version(linux)
         {
             int sta = -1;
-            auto r = send(Command.CDROM_DRIVE_STATUS, sta);
+            immutable r = send(Command.CDROM_DRIVE_STATUS, sta);
             if (r && sta != Status.CDS_NO_INFO)
             {
                 return sta == Status.CDS_TRAY_OPEN ?
@@ -206,7 +206,7 @@ struct Ejector
             int sta;
             auto buf = new char[CAM_ERRBUF_SIZE];
             buf[] = '\0';
-            auto r = get_tray_status(drive.toStringz, &sta, buf.ptr,
+            immutable r = get_tray_status(drive.toStringz, &sta, buf.ptr,
                 CAM_ERRBUF_SIZE) == 0;
             if (r && sta != TrayStatus.ERROR)
             {
@@ -255,7 +255,7 @@ struct Ejector
             }
 
             int sta;
-            auto r = send(Command.SG_IO, sta, &hdr);
+            immutable r = send(Command.SG_IO, sta, &hdr);
 
             int cap;
 
@@ -263,18 +263,18 @@ struct Ejector
             {
                 // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
                 // Test the Eject bit
-                auto eject = buf[12] & 0b00001000;
+                immutable eject = buf[12] & 0b00001000;
                 if (eject)
                 {
                     cap |= Capability.CDC_OPEN_TRAY;
                 }
 
                 // The Loading Mechanism Type field
-                auto mech = buf[12] >> 5;
+                immutable mech = buf[12] >> 5;
 
                 // Test the Version field and the Load bit
-                auto version_ = (buf[10] >> 2) & 0b00001111;
-                auto load = buf[12] & 0b00010000;
+                immutable version_ = (buf[10] >> 2) & 0b00001111;
+                immutable load = buf[12] & 0b00010000;
                 if (version_ > 0 && load)
                 {
                     cap |= Capability.CDC_CLOSE_TRAY;
@@ -304,7 +304,7 @@ struct Ejector
             int sta;
             auto buf = new char[CAM_ERRBUF_SIZE];
             buf[] = '\0';
-            auto r = get_tray_capability(drive.toStringz, &sta, buf.ptr,
+            immutable r = get_tray_capability(drive.toStringz, &sta, buf.ptr,
                 CAM_ERRBUF_SIZE) == 0;
             debug(VerboseEjector)
             {
@@ -469,12 +469,13 @@ struct Ejector
     }
     private auto createDriveHandle()
     {
-        auto drivePath = `\\.\` ~ (drive == "" ? defaultDrive : drive) ~ ":";
+        immutable drivePath = `\\.\` ~
+            (drive == "" ? defaultDrive : drive) ~ ":";
 
         auto h = CreateFile(drivePath.toStrZ, GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
 
-        auto err = GetLastError;
+        immutable err = GetLastError;
         logError(`CreateFile("` ~ drivePath ~ `") ` ~
             (err == 0 ? "succeeded" : "failed"), err);
 
@@ -490,8 +491,8 @@ struct Ejector
             return TrayStatus.ERROR;
         }
 
-        auto sptdSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
-        ubyte padding = 255;
+        enum sptdSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
+        enum padding = ubyte(255);
         ubyte[8] buf = padding;  // Mechanism Status Header has 8 bytes
 
         auto sptd = SCSI_PASS_THROUGH_DIRECT();
@@ -507,10 +508,10 @@ struct Ejector
         sptd.Cdb[9] = buf.length;
 
         DWORD ret;
-        auto dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,
+        immutable dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,
             &sptd, sptdSize, &sptd, sptdSize, &ret, null);
 
-        auto err = GetLastError;
+        immutable err = GetLastError;
         logError("DeviceIoControl() " ~
             (err == 0 ? "succeeded" : "failed"), err);
 
@@ -540,18 +541,18 @@ struct Ejector
             return false;
         }
 
-        auto gciiSize = USHORT(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
+        enum gciiSize = USHORT(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
         enum bufSize = 16;  // Response has 16 bytes (header + descriptor)
         ubyte[bufSize] buf;
 
         auto gcii = GET_CONFIGURATION_IOCTL_INPUT();
-        gcii.Feature = FEATURE_NUMBER. FeatureRemovableMedium;
+        gcii.Feature = FEATURE_NUMBER.FeatureRemovableMedium;
         gcii.RequestType = SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE;
 
         DWORD ret;
-        auto dic = DeviceIoControl(h, IOCTL_CDROM_GET_CONFIGURATION,
+        immutable dic = DeviceIoControl(h, IOCTL_CDROM_GET_CONFIGURATION,
             &gcii, gciiSize, buf.ptr, bufSize, &ret, null);
-        auto err = GetLastError;
+        immutable err = GetLastError;
         logError("DeviceIoControl() " ~
             (err == 0 ? "succeeded" : "failed"), err);
 
@@ -563,7 +564,7 @@ struct Ejector
 
         // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
         // Test the Eject bit
-        auto eject = !!(buf[12] & 0b00001000);
+        immutable eject = !!(buf[12] & 0b00001000);
         // If dic fails, we might have to execute MODE SENSE (10)
         return dic && eject;
 
@@ -602,8 +603,8 @@ struct Ejector
         DWORD ret;
         enum cmd = s == "open" ?
             IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
-        auto dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
-        auto err = GetLastError;
+        immutable dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
+        immutable err = GetLastError;
 
         logError("DeviceIoControl() " ~
             (err == 0 ? "succeeded" : "failed"), err);
