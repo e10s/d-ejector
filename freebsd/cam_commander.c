@@ -23,21 +23,7 @@ int _cam_commander(const char* path, const unsigned char* cmd,
     const int cmd_len, unsigned char* buf, int buf_len, int* status,
     char* err_str_buf, const int err_str_buf_len)
 {
-    char dev_name[DEV_IDLEN + 1];
-    int unit;
-
-    int cgd = cam_get_device(path, dev_name, DEV_IDLEN, &unit);
-    if (cgd == -1)
-    {
-        if (err_str_buf != NULL)
-        {
-            strcpy(err_str_buf, cam_errbuf);
-        }
-        return -1;
-    }
-
-    struct cam_device* cam_dev =
-        cam_open_spec_device(dev_name, unit, O_RDWR, NULL);
+    struct cam_device* cam_dev = cam_open_device(path, O_RDWR);
     if (!cam_dev)
     {
         if (err_str_buf != NULL)
@@ -49,9 +35,9 @@ int _cam_commander(const char* path, const unsigned char* cmd,
 
     union ccb ccb;
     
-    cam_fill_csio(&ccb.csio, 1, NULL, CAM_DIR_IN, MSG_SIMPLE_Q_TAG,
-        buf, buf_len, 0, cmd_len, 5000);
-    memcpy(ccb.csio.cdb_io.cdb_bytes, cmd, cmd_len);
+    cam_fill_csio(&ccb.csio, 1, NULL, CAM_CDB_POINTER | CAM_DIR_IN,
+		MSG_SIMPLE_Q_TAG, buf, buf_len, 0, cmd_len, 5000);
+    ccb.csio.cdb_io.cdb_ptr = (u_int8_t*)cmd;
 
     int csc = cam_send_ccb(cam_dev, &ccb);
     if (csc == -1)
