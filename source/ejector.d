@@ -396,6 +396,42 @@ version(Windows) private
         FeatureRemovableMedium = 0x0003
     }
 
+    struct GET_CONFIGURATION_HEADER(T)
+    {
+        UCHAR[4] DataLength;
+        UCHAR[2] Reserved;
+        UCHAR[2] CurrentProfile;
+        T Data;  // Modified for convenience
+    }
+
+    struct FEATURE_HEADER
+    {
+        UCHAR[2] FeatureCode;
+        import std.bitmanip : bitfields;
+        mixin(bitfields!(
+            UCHAR, "Current", 1,
+            UCHAR, "Persistent", 1,
+            UCHAR, "Version" , 4,
+            UCHAR, "Reserved0", 2
+        ));
+        UCHAR AdditionalLength;
+    }
+
+    struct FEATURE_DATA_REMOVABLE_MEDIUM
+    {
+        FEATURE_HEADER Header;
+        import std.bitmanip : bitfields;
+        mixin(bitfields!(
+            UCHAR, "Lockable", 1,
+            UCHAR, "DBML", 1,  // If Version >= 2
+            UCHAR, "DefaultToPrevent", 1,
+            UCHAR, "Eject", 1,
+            UCHAR, "Load", 1,  // If Version >= 1
+            UCHAR, "LoadingMechanism", 3
+        ));
+        UCHAR[3] Reserved3;
+    }
+
     enum SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE = 0x2;
 
     struct GET_CONFIGURATION_IOCTL_INPUT
@@ -541,17 +577,18 @@ struct Ejector
             return false;
         }
 
-        enum gciiSize = USHORT(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
-        enum bufSize = 16;  // Response has 16 bytes (header + descriptor)
-        ubyte[bufSize] buf;
+        alias GCH = GET_CONFIGURATION_HEADER!FEATURE_DATA_REMOVABLE_MEDIUM;
+        enum gciiSize = DWORD(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
+        enum gchSize = DWORD(GCH.sizeof);
 
         auto gcii = GET_CONFIGURATION_IOCTL_INPUT();
         gcii.Feature = FEATURE_NUMBER.FeatureRemovableMedium;
         gcii.RequestType = SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE;
+        auto gch = GCH();
 
         DWORD ret;
         immutable dic = DeviceIoControl(h, IOCTL_CDROM_GET_CONFIGURATION,
-            &gcii, gciiSize, buf.ptr, bufSize, &ret, null);
+            &gcii, gciiSize, &gch, gchSize, &ret, null);
         immutable err = GetLastError;
         logError("DeviceIoControl() " ~
             (err == 0 ? "succeeded" : "failed"), err);
@@ -559,23 +596,18 @@ struct Ejector
         debug(VerboseEjector)
         {
             import std.stdio : stderr, writeln;
-            stderr.writeln(buf);
+            stderr.writeln(gch);
         }
 
         // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
         // Test the Eject bit
-        immutable eject = !!(buf[12] & 0b00001000);
+        immutable eject = !!gch.Data.Eject;
         // If dic fails, we might have to execute MODE SENSE (10)
         return dic && eject;
 
-        // The Loading Mechanism Type field
-        // auto mech = buf[12] >> 5;
-
         // Test the Version field and the Load bit
         /*
-        auto version_ = (buf[10] >> 2) & 0b00001111;
-        auto load = !!(buf[12] & 0b00010000);
-        if (version_ > 0 && load)
+        if (gch.Data.Header.Version > 0 && gch.Data.Load)
         {
             // Closable
         }
@@ -584,7 +616,7 @@ struct Ejector
         // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
         // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
         /*
-        else if (mech != 0)
+        else if (gch.Data.LoadingMechanism != 0)
         {
             // Maybe closable
         }
