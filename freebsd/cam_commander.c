@@ -36,7 +36,7 @@ int _cam_commander(const char* path, const unsigned char* cmd,
     union ccb ccb;
     
     cam_fill_csio(&ccb.csio, 1, NULL, CAM_CDB_POINTER | CAM_DIR_IN,
-		MSG_SIMPLE_Q_TAG, buf, buf_len, 0, cmd_len, 5000);
+        MSG_SIMPLE_Q_TAG, buf, buf_len, 0, cmd_len, 5000);
     ccb.csio.cdb_io.cdb_ptr = (u_int8_t*)cmd;
 
     int csc = cam_send_ccb(cam_dev, &ccb);
