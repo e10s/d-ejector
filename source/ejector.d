@@ -293,7 +293,8 @@ struct Ejector
         }
     }
     version(FreeBSD)
-    @property auto ejectable()
+    @property auto opDispatch(string s)()
+        if (s == "ejectable" || s == "closable")
     {
         import std.string : toStringz;
         int sta;
@@ -314,7 +315,8 @@ struct Ejector
                 stderr.writeln("get_tray_capability failed,\n", buf.text);
             }
         }
-        return r && (sta & Capability.CDDOEJECT);
+        return r && !!(sta & (s == "ejectable" ? 
+            Capability.CDDOEJECT : Capability.CDDOCLOSE));
     }
     auto open()
     {
