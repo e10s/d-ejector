@@ -230,8 +230,8 @@ struct Ejector
         }
     }
     version(linux)
-    @property auto opDispatch(string s)()
-        if (s == "ejectable" || s == "closable")
+    @property private auto opDispatch(string s)()
+        if (s == "ejectableImpl" || s == "closableImpl")
     {
         enum GET_CONFIGURATION_CMD_LEN = 12;
         enum GET_CONFIGURATION_RESPONSE_BUF_LEN = 16;
@@ -265,7 +265,7 @@ struct Ejector
 
         // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
         // Test the Eject bit
-        static if (s == "ejectable")
+        static if (s == "ejectableImpl")
         {
             immutable eject = buf[12] & 0b00001000;
             return !!eject;
@@ -293,8 +293,8 @@ struct Ejector
         }
     }
     version(FreeBSD)
-    @property auto opDispatch(string s)()
-        if (s == "ejectable" || s == "closable")
+    @property private auto opDispatch(string s)()
+        if (s == "ejectableImpl" || s == "closableImpl")
     {
         import std.string : toStringz;
         int sta;
@@ -315,8 +315,16 @@ struct Ejector
                 stderr.writeln("get_tray_capability failed,\n", buf.text);
             }
         }
-        return r && !!(sta & (s == "ejectable" ? 
+        return r && !!(sta & (s == "ejectableImpl" ? 
             Capability.CDDOEJECT : Capability.CDDOCLOSE));
+    }
+    @property auto ejectable()
+    {
+        return this.ejectableImpl;
+    }
+    @property auto closable()
+    {
+        return this.closableImpl;
     }
     auto open()
     {
@@ -563,8 +571,8 @@ struct Ejector
             return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;
         }
     }
-    @property auto opDispatch(string s)()
-        if (s == "ejectable" || s == "closable")
+    @property private auto opDispatch(string s)()
+        if (s == "ejectableImpl" || s == "closableImpl")
     {
         auto h = createDriveHandle();
         scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
@@ -602,7 +610,7 @@ struct Ejector
             stderr.writeln(gch);
         }
 
-        static if (s == "ejectable")
+        static if (s == "ejectableImpl")
         {
             // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
             // Test the Eject bit
@@ -625,7 +633,16 @@ struct Ejector
             }
         }
     }
-    auto opDispatch(string s)() if (s == "open" || s == "closed")
+    @property auto ejectable()
+    {
+        return this.ejectableImpl;
+    }
+    @property auto closable()
+    {
+        return this.closableImpl;
+    }
+    private auto opDispatch(string s)()
+        if (s == "openImpl" || s == "closedImpl")
     {
         auto h = createDriveHandle();
         scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
@@ -636,7 +653,7 @@ struct Ejector
         }
 
         DWORD ret;
-        enum cmd = s == "open" ?
+        enum cmd = s == "openImpl" ?
             IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
         immutable dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
         immutable err = GetLastError;
@@ -645,5 +662,13 @@ struct Ejector
             (err == 0 ? "succeeded" : "failed"), err);
 
         return !!dic;
+    }
+    auto open()
+    {
+        return this.openImpl;
+    }
+    auto closed()
+    {
+        return this.closedImpl;
     }
 }
