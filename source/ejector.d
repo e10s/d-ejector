@@ -567,7 +567,8 @@ struct Ejector
             return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;
         }
     }
-    @property auto ejectable()
+    @property auto opDispatch(string s)()
+        if (s == "ejectable" || s == "closable")
     {
         auto h = createDriveHandle();
         scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
@@ -593,34 +594,40 @@ struct Ejector
         logError("DeviceIoControl() " ~
             (err == 0 ? "succeeded" : "failed"), err);
 
+        if (!dic)
+        {
+            // If dic fails, we might have to execute MODE SENSE (10)
+            return false;
+        }
+
         debug(VerboseEjector)
         {
             import std.stdio : stderr, writeln;
             stderr.writeln(gch);
         }
 
-        // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
-        // Test the Eject bit
-        immutable eject = !!gch.Data.Eject;
-        // If dic fails, we might have to execute MODE SENSE (10)
-        return dic && eject;
-
-        // Test the Version field and the Load bit
-        /*
-        if (gch.Data.Header.Version > 0 && gch.Data.Load)
+        static if (s == "ejectable")
         {
-            // Closable
+            // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
+            // Test the Eject bit
+            return !!gch.Data.Eject;
         }
-        */
-        // [[ Doubtful ]]
-        // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
-        // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-        /*
-        else if (gch.Data.LoadingMechanism != 0)
+        else
         {
-            // Maybe closable
+            // Test the Version field and the Load bit
+            if (gch.Data.Header.Version > 0)
+            {
+                return !!gch.Data.Load;
+            }
+            // [[ Doubtful ]]
+            // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
+            // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
+            else
+            {
+                // Maybe closable
+                return gch.Data.LoadingMechanism != 0;
+            }
         }
-        */
     }
     auto opDispatch(string s)() if (s == "open" || s == "closed")
     {
