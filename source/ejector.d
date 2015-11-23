@@ -229,98 +229,92 @@ struct Ejector
             }
         }
     }
-    @property auto ejectable()
+    version(linux)
+    @property auto opDispatch(string s)()
+        if (s == "ejectable" || s == "closable")
     {
-        version(linux)
+        enum GET_CONFIGURATION_CMD_LEN = 12;
+        enum GET_CONFIGURATION_RESPONSE_BUF_LEN = 16;
+
+        auto buf = new ubyte[GET_CONFIGURATION_RESPONSE_BUF_LEN];
+        static immutable ubyte[GET_CONFIGURATION_CMD_LEN]
+            get_configuration_cmd =
+            [0x46, 0x02, 0, 0x03, 0, 0, 0, 0, 16, 0, 0, 0];
+
+        auto hdr = sg_io_hdr();
+        with (hdr)
         {
-            enum GET_CONFIGURATION_CMD_LEN = 12;
-            enum GET_CONFIGURATION_RESPONSE_BUF_LEN = 16;
+            interface_id = SG_INTERFACE_ID_ORIG;
+            dxfer_direction = SG_DXFER_FROM_DEV;
+            cmd_len = GET_CONFIGURATION_CMD_LEN;
+            dxfer_len = GET_CONFIGURATION_RESPONSE_BUF_LEN;
+            dxferp = buf.ptr;
+            cmdp = cast(ubyte*)get_configuration_cmd.ptr;
+            sbp = null;
+            timeout = 5000;
+        }
 
-            auto buf = new ubyte[GET_CONFIGURATION_RESPONSE_BUF_LEN];
-            static immutable ubyte[GET_CONFIGURATION_CMD_LEN]
-                get_configuration_cmd =
-                [0x46, 0x02, 0, 0x03, 0, 0, 0, 0, 16, 0, 0, 0];
+        int sta;
+        immutable r = send(Command.SG_IO, sta, &hdr);
 
-            auto hdr = sg_io_hdr();
-            with (hdr)
+        if (!r)
+        {
+            // We might have to execute MODE SENSE (10)
+            return false;
+        }
+
+        // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
+        // Test the Eject bit
+        static if (s == "ejectable")
+        {
+            immutable eject = buf[12] & 0b00001000;
+            return !!eject;
+        }
+        else
+        {
+            // Test the Version field and the Load bit
+            immutable version_ = (buf[10] >> 2) & 0b00001111;
+            if (version_ > 0)
             {
-                interface_id = SG_INTERFACE_ID_ORIG;
-                dxfer_direction = SG_DXFER_FROM_DEV;
-                cmd_len = GET_CONFIGURATION_CMD_LEN;
-                dxfer_len = GET_CONFIGURATION_RESPONSE_BUF_LEN;
-                dxferp = buf.ptr;
-                cmdp = cast(ubyte*)get_configuration_cmd.ptr;
-                sbp = null;
-                timeout = 5000;
-            }
-
-            int sta;
-            immutable r = send(Command.SG_IO, sta, &hdr);
-
-            int cap;
-
-            if (r)
-            {
-                // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
-                // Test the Eject bit
-                immutable eject = buf[12] & 0b00001000;
-                if (eject)
-                {
-                    cap |= Capability.CDC_OPEN_TRAY;
-                }
-
-                // The Loading Mechanism Type field
-                immutable mech = buf[12] >> 5;
-
-                // Test the Version field and the Load bit
-                immutable version_ = (buf[10] >> 2) & 0b00001111;
                 immutable load = buf[12] & 0b00010000;
-                if (version_ > 0 && load)
-                {
-                    cap |= Capability.CDC_CLOSE_TRAY;
-                }
-                // [[ Doubtful ]]
-                // Guess from the Loading Mechanism Type field
-                // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
-                // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-                else if (mech != 0)
-                {
-                    // Maybe closable
-                    cap |= Capability.CDC_CLOSE_TRAY;
-                }
+                return !!load;
             }
-            /*
+            // [[ Doubtful ]]
+            // Guess from the Loading Mechanism Type field
+            // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
+            // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
             else
             {
-                // We might have to execute MODE SENSE (10)
+                // The Loading Mechanism Type field
+                immutable mech = buf[12] >> 5;
+                // Maybe closable
+                return mech != 0;
             }
-            */
-
-            return r && (cap & Capability.CDC_OPEN_TRAY);
         }
-        version(FreeBSD)
+    }
+    version(FreeBSD)
+    @property auto ejectable()
+    {
+        import std.string : toStringz;
+        int sta;
+        auto buf = new char[CAM_ERRBUF_SIZE];
+        buf[] = '\0';
+        immutable r = get_tray_capability(drive.toStringz, &sta, buf.ptr,
+            CAM_ERRBUF_SIZE) == 0;
+        debug(VerboseEjector)
         {
-            import std.string : toStringz;
-            int sta;
-            auto buf = new char[CAM_ERRBUF_SIZE];
-            buf[] = '\0';
-            immutable r = get_tray_capability(drive.toStringz, &sta, buf.ptr,
-                CAM_ERRBUF_SIZE) == 0;
-            debug(VerboseEjector)
+            import std.stdio : stderr, writeln;
+            if (r)
             {
-                import std.stdio : stderr, writeln;
-                if (r)
-                {
-                    stderr.writeln("get_tray_capability succeeded");
-                }
-                else
-                {
-                    import std.conv : text;
-                    stderr.writeln("get_tray_capability failed,\n", buf.text);
-                }
+                stderr.writeln("get_tray_capability succeeded");
             }
-            return r && (sta & Capability.CDDOEJECT);
+            else
+            {
+                import std.conv : text;
+                stderr.writeln("get_tray_capability failed,\n", buf.text);
+            }
         }
+        return r && (sta & Capability.CDDOEJECT);
     }
     auto open()
     {
