@@ -39,7 +39,7 @@ int _cam_commander(const char* path, const unsigned char* cmd,
         MSG_SIMPLE_Q_TAG, buf, buf_len, 0, cmd_len, 5000);
     ccb.csio.cdb_io.cdb_ptr = (u_int8_t*)cmd;
 
-    int csc = cam_send_ccb(cam_dev, &ccb);
+    const int csc = cam_send_ccb(cam_dev, &ccb);
     if (csc == -1)
     {
         if (err_str_buf != NULL)
@@ -65,11 +65,11 @@ int get_tray_status(const char* path, int* status,
 
     *status = ERROR;
 
-    static const unsigned char mechanism_status_cmd[MECHANISM_STATUS_CMD_LEN] =
+    static const unsigned char mechanism_status_cmd[] =
         {0xBD, 0, 0, 0, 0, 0, 0, 0, 0, MECHANISM_STATUS_RESPONSE_BUF_LEN, 0, 0};
     unsigned char mechanism_status_response_buf[MECHANISM_STATUS_RESPONSE_BUF_LEN];
 
-    int cc = _cam_commander(path, mechanism_status_cmd, MECHANISM_STATUS_CMD_LEN,
+    const int cc = _cam_commander(path, mechanism_status_cmd, MECHANISM_STATUS_CMD_LEN,
         mechanism_status_response_buf, MECHANISM_STATUS_RESPONSE_BUF_LEN, status,
         err_str_buf, err_str_buf_len);
     
@@ -91,11 +91,11 @@ int get_tray_capability(const char* path, int* status,
 {
     *status = 0;
 
-    static const unsigned char get_configuration_cmd[GET_CONFIGURATION_CMD_LEN] =
+    static const unsigned char get_configuration_cmd[] =
         {0x46, 0x02, 0, 0x03, 0, 0, 0, 0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0};
     unsigned char get_configuration_response_buf[GET_CONFIGURATION_RESPONSE_BUF_LEN];
 
-    int cc = _cam_commander(path, get_configuration_cmd, GET_CONFIGURATION_CMD_LEN,
+    const int cc = _cam_commander(path, get_configuration_cmd, GET_CONFIGURATION_CMD_LEN,
         get_configuration_response_buf, GET_CONFIGURATION_RESPONSE_BUF_LEN, status,
         err_str_buf, err_str_buf_len);
     
@@ -106,17 +106,17 @@ int get_tray_capability(const char* path, int* status,
     }
 
     // Test the Eject bit
-    int eject = get_configuration_response_buf[12] & 0b00001000;
+    const int eject = get_configuration_response_buf[12] & 0b00001000;
     if (eject)
     {
         *status |= CDDOEJECT;
     }
 
     // Test the Version field and the Load bit
-    int version = (get_configuration_response_buf[10] >> 2) & 0b00001111;
+    const int version = (get_configuration_response_buf[10] >> 2) & 0b00001111;
     if (version > 0)
     {
-        int load = get_configuration_response_buf[12] & 0b00010000;
+        const int load = get_configuration_response_buf[12] & 0b00010000;
         if (load)
         {
             *status |= CDDOCLOSE;
@@ -129,7 +129,7 @@ int get_tray_capability(const char* path, int* status,
     else
     {
         // The Loading Mechanism Type field
-        int mech = get_configuration_response_buf[12] >> 5;
+        const int mech = get_configuration_response_buf[12] >> 5;
         if (mech != 0)
         {
             // Maybe closable
