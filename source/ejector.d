@@ -400,12 +400,12 @@ version(Windows) private
         FeatureRemovableMedium = 0x0003
     }
 
-    struct GET_CONFIGURATION_HEADER(T)
+    struct GET_CONFIGURATION_HEADER
     {
         UCHAR[4] DataLength;
         UCHAR[2] Reserved;
         UCHAR[2] CurrentProfile;
-        T Data;  // Modified for convenience
+        UCHAR[0] Data;
     }
 
     struct FEATURE_HEADER
@@ -582,18 +582,23 @@ struct Ejector
             return false;
         }
 
-        alias GCH = GET_CONFIGURATION_HEADER!FEATURE_DATA_REMOVABLE_MEDIUM;
+        alias GCH = GET_CONFIGURATION_HEADER;
+        alias FDRM = FEATURE_DATA_REMOVABLE_MEDIUM;
         enum gciiSize = DWORD(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
-        enum gchSize = DWORD(GCH.sizeof);
+        enum gchSize = DWORD(GCH.sizeof + FDRM.sizeof);
 
         auto gcii = GET_CONFIGURATION_IOCTL_INPUT();
         gcii.Feature = FEATURE_NUMBER.FeatureRemovableMedium;
         gcii.RequestType = SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE;
-        auto gch = GCH();
+
+        import std.conv : emplace;
+        auto pHolder = new void[gchSize];
+        auto pGCH = emplace!GCH(pHolder);
+        auto pFDRM = emplace!FDRM(pHolder[GCH.sizeof .. $]);
 
         DWORD ret;
         immutable dic = DeviceIoControl(h, IOCTL_CDROM_GET_CONFIGURATION,
-            &gcii, gciiSize, &gch, gchSize, &ret, null);
+            &gcii, gciiSize, pGCH, gchSize, &ret, null);
         immutable err = GetLastError;
         logError("DeviceIoControl() " ~
             (err == 0 ? "succeeded" : "failed"), err);
@@ -604,24 +609,25 @@ struct Ejector
             return false;
         }
 
+
         debug(VerboseEjector)
         {
             import std.stdio : stderr, writeln;
-            stderr.writeln(gch);
+            stderr.writeln(*pGCH, *pFDRM);
         }
 
         static if (s == "ejectableImpl")
         {
             // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
             // Test the Eject bit
-            return !!gch.Data.Eject;
+            return !!pFDRM.Eject;
         }
         else
         {
             // Test the Version field and the Load bit
-            if (gch.Data.Header.Version > 0)
+            if (pFDRM.Header.Version > 0)
             {
-                return !!gch.Data.Load;
+                return !!pFDRM.Load;
             }
             // [[ Doubtful ]]
             // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
@@ -629,7 +635,7 @@ struct Ejector
             else
             {
                 // Maybe closable
-                return gch.Data.LoadingMechanism != 0;
+                return pFDRM.LoadingMechanism != 0;
             }
         }
     }
