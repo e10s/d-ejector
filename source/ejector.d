@@ -241,18 +241,16 @@ struct Ejector
             get_configuration_cmd =
             [0x46, 0x02, 0, 0x03, 0, 0, 0, 0, 16, 0, 0, 0];
 
-        auto hdr = sg_io_hdr();
-        with (hdr)
-        {
-            interface_id = SG_INTERFACE_ID_ORIG;
-            dxfer_direction = SG_DXFER_FROM_DEV;
-            cmd_len = GET_CONFIGURATION_CMD_LEN;
-            dxfer_len = GET_CONFIGURATION_RESPONSE_BUF_LEN;
-            dxferp = buf.ptr;
-            cmdp = cast(ubyte*)get_configuration_cmd.ptr;
-            sbp = null;
-            timeout = 5000;
-        }
+        sg_io_hdr hdr = {
+            interface_id : SG_INTERFACE_ID_ORIG,
+            dxfer_direction : SG_DXFER_FROM_DEV,
+            cmd_len : GET_CONFIGURATION_CMD_LEN,
+            dxfer_len : GET_CONFIGURATION_RESPONSE_BUF_LEN,
+            dxferp : buf.ptr,
+            cmdp : cast(ubyte*)get_configuration_cmd.ptr,
+            sbp : null,
+            timeout : 5000
+        };
 
         int sta;
         immutable r = send(Command.SG_IO, sta, &hdr);
@@ -446,7 +444,7 @@ version(Windows) private
     }
 
 
-    //ntddcdrm.h
+    // ntddcdrm.h
     alias IOCTL_CDROM_BASE = FILE_DEVICE_CD_ROM;
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
         METHOD_BUFFERED, FILE_READ_ACCESS);
@@ -535,15 +533,16 @@ struct Ejector
         enum padding = ubyte(255);
         ubyte[8] buf = padding;  // Mechanism Status Header has 8 bytes
 
-        auto sptd = SCSI_PASS_THROUGH_DIRECT();
-        sptd.Length = sptdSize;
-        // PathId, TargetId and Lun are "don't-care" params:
-        // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
-        sptd.CdbLength = 12;
-        sptd.DataIn = SCSI_IOCTL_DATA_IN;
-        sptd.DataTransferLength = buf.length;
-        sptd.TimeOutValue = 5;
-        sptd.DataBuffer = buf.ptr;
+        SCSI_PASS_THROUGH_DIRECT sptd = {
+            Length : sptdSize,
+            // PathId, TargetId and Lun are "don't-care" params:
+            // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
+            CdbLength : 12,
+            DataIn : SCSI_IOCTL_DATA_IN,
+            DataTransferLength : buf.length,
+            TimeOutValue : 5,
+            DataBuffer : buf.ptr
+        };
         sptd.Cdb[0] = SCSIOP_MECHANISM_STATUS;
         sptd.Cdb[9] = buf.length;
 
@@ -587,9 +586,10 @@ struct Ejector
         enum gciiSize = DWORD(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
         enum gchSize = DWORD(GCH.sizeof + FDRM.sizeof);
 
-        auto gcii = GET_CONFIGURATION_IOCTL_INPUT();
-        gcii.Feature = FEATURE_NUMBER.FeatureRemovableMedium;
-        gcii.RequestType = SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE;
+        GET_CONFIGURATION_IOCTL_INPUT gcii = {
+            Feature : FEATURE_NUMBER.FeatureRemovableMedium,
+            RequestType : SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
+        };
 
         import std.conv : emplace;
         auto pHolder = new void[gchSize];
