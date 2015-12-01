@@ -88,13 +88,40 @@ version(FreeBSD)
 
 version(FreeBSD) private
 {
-    // cam_commander.c
-    extern(C) int get_tray_status(const char*, int*, char*, const int);
-    extern(C) int get_tray_capability(const char*, int*, char*, const int);
+    /*
+        Generated from ccb.c
+
+        enum CCB_SIZE = ??;
+        enum CCB_CDB_LEN_OFFSET = ??;
+        enum CCB_CDB_BYTES_OFFSET = ??;
+    */
+    mixin(import("ccb.mixin"));
+
+
+    // cam/cam_ccb.h
+    // https://github.com/freebsd/freebsd/blob/master/sys/cam/cam_ccb.h
+    enum ccb_flags
+    {
+	    CAM_DIR_IN = 0x00000040
+    }
+
+    union ccb;
+    struct ccb_scsiio;
+
+    extern(C) int csio_build(ccb_scsiio*, ubyte*, uint, uint, int, int,
+        const(char)*, ...);
+
 
     // camlib.h
     // https://github.com/freebsd/freebsd/blob/master/lib/libcam/camlib.h
     enum CAM_ERRBUF_SIZE = 2048;
+    struct cam_device;
+
+    extern(C) __gshared ubyte[CAM_ERRBUF_SIZE] cam_errbuf;
+    extern(C) cam_device* cam_open_device(const(char)*, int);
+    extern(C) void cam_close_device(cam_device*);
+    extern(C) int cam_send_ccb(cam_device*, ccb*);
+
 
     // sys/ioccom.h
     // https://github.com/freebsd/freebsd/blob/master/sys/sys/ioccom.h
@@ -184,6 +211,40 @@ struct Ejector
         int sta;
         return send(cmd, sta);
     }
+    private auto camCommander(in ubyte[] cmd, ref ubyte[] buf)
+    {
+        import core.sys.posix.fcntl : O_RDWR;
+        import std.string : toStringz;
+
+        auto cam_dev = cam_open_device(drive.toStringz, O_RDWR);
+        if (!cam_dev)
+        {
+            import std.stdio : stderr, writeln;
+            stderr.writeln(cast(string)cam_errbuf);
+            return false;
+        }
+
+        ubyte[CCB_SIZE] ccbLike;  // substitute for union ccb
+        csio_build(cast(ccb_scsiio*)ccbLike.ptr, buf.ptr,
+            cast(uint)buf.length, ccb_flags.CAM_DIR_IN,
+            1, 5000, "".toStringz);
+        ccbLike[CCB_CDB_LEN_OFFSET] = cast(ubyte)cmd.length;
+        ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + cmd.length] =
+            cmd[];
+
+        immutable csc = cam_send_ccb(cam_dev, cast(ccb*)ccbLike.ptr);
+        if (csc == -1)
+        {
+            import std.stdio : stderr, writeln;
+            stderr.writeln(cast(string)cam_errbuf);
+            cam_close_device(cam_dev);
+            return false;
+        }
+
+        cam_close_device(cam_dev);
+
+        return true;
+    }
     @property auto status()
     {
         version(linux)
@@ -202,34 +263,38 @@ struct Ejector
         }
         version(FreeBSD)
         {
-            import std.string : toStringz;
-            int sta;
-            auto buf = new char[CAM_ERRBUF_SIZE];
-            buf[] = '\0';
-            immutable r = get_tray_status(drive.toStringz, &sta, buf.ptr,
-                CAM_ERRBUF_SIZE) == 0;
-            if (r && sta != TrayStatus.ERROR)
+            enum MECHANISM_STATUS_CMD_LEN = 12;
+            enum MECHANISM_STATUS_RESPONSE_BUF_LEN = 8;
+
+            auto buf = new ubyte[MECHANISM_STATUS_RESPONSE_BUF_LEN];
+            static immutable ubyte[MECHANISM_STATUS_CMD_LEN]
+                mechanism_status_cmd =
+                [0xBD, 0, 0, 0, 0, 0, 0, 0,
+                0, MECHANISM_STATUS_RESPONSE_BUF_LEN, 0, 0];
+
+            immutable r = camCommander(mechanism_status_cmd[], buf);
+
+            if (r)
             {
                 debug(VerboseEjector)
                 {
                     import std.stdio : stderr, writeln;
-                    stderr.writeln("get_tray_status succeeded");
+                    stderr.writeln("status succeeded");
                 }
-                return sta == 1 ? TrayStatus.OPEN : TrayStatus.CLOSED;
+                return buf[1] & 0b00010000 ?
+                    TrayStatus.OPEN : TrayStatus.CLOSED;
             }
             else
             {
                 debug(VerboseEjector)
                 {
-                    import std.conv : text;
                     import std.stdio : stderr, writeln;
-                    stderr.writeln("get_tray_status failed,\n", buf.text);
+                    stderr.writeln("status failed");
                 }
                 return TrayStatus.ERROR;
             }
         }
     }
-    version(linux)
     @property private auto opDispatch(string s)()
         if (s == "ejectableImpl" || s == "closableImpl")
     {
@@ -239,21 +304,44 @@ struct Ejector
         auto buf = new ubyte[GET_CONFIGURATION_RESPONSE_BUF_LEN];
         static immutable ubyte[GET_CONFIGURATION_CMD_LEN]
             get_configuration_cmd =
-            [0x46, 0x02, 0, 0x03, 0, 0, 0, 0, 16, 0, 0, 0];
+            [0x46, 0x02, 0, 0x03, 0, 0, 0,
+            0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0];
 
-        sg_io_hdr hdr = {
-            interface_id : SG_INTERFACE_ID_ORIG,
-            dxfer_direction : SG_DXFER_FROM_DEV,
-            cmd_len : GET_CONFIGURATION_CMD_LEN,
-            dxfer_len : GET_CONFIGURATION_RESPONSE_BUF_LEN,
-            dxferp : buf.ptr,
-            cmdp : cast(ubyte*)get_configuration_cmd.ptr,
-            sbp : null,
-            timeout : 5000
-        };
+        version(linux)
+        {
+            sg_io_hdr hdr = {
+                interface_id : SG_INTERFACE_ID_ORIG,
+                dxfer_direction : SG_DXFER_FROM_DEV,
+                cmd_len : GET_CONFIGURATION_CMD_LEN,
+                dxfer_len : GET_CONFIGURATION_RESPONSE_BUF_LEN,
+                dxferp : buf.ptr,
+                cmdp : cast(ubyte*)get_configuration_cmd.ptr,
+                sbp : null,
+                timeout : 5000
+            };
 
-        int sta;
-        immutable r = send(Command.SG_IO, sta, &hdr);
+            int sta;
+            immutable r = send(Command.SG_IO, sta, &hdr);
+        }
+        version(FreeBSD)
+        {
+            immutable r = camCommander(get_configuration_cmd[], buf);
+        }
+
+        debug(VerboseEjector)
+        {
+            if (r)
+            {
+                import std.stdio : stderr, writeln;
+                stderr.writeln(s, " succeeded");
+            }
+            else
+            {
+                import std.stdio : stderr, writeln;
+                import std.conv : text;
+                stderr.writeln(s, " failed");
+            }
+        }
 
         if (!r)
         {
@@ -289,32 +377,6 @@ struct Ejector
                 return mech != 0;
             }
         }
-    }
-    version(FreeBSD)
-    @property private auto opDispatch(string s)()
-        if (s == "ejectableImpl" || s == "closableImpl")
-    {
-        import std.string : toStringz;
-        int sta;
-        auto buf = new char[CAM_ERRBUF_SIZE];
-        buf[] = '\0';
-        immutable r = get_tray_capability(drive.toStringz, &sta, buf.ptr,
-            CAM_ERRBUF_SIZE) == 0;
-        debug(VerboseEjector)
-        {
-            import std.stdio : stderr, writeln;
-            if (r)
-            {
-                stderr.writeln("get_tray_capability succeeded");
-            }
-            else
-            {
-                import std.conv : text;
-                stderr.writeln("get_tray_capability failed,\n", buf.text);
-            }
-        }
-        return r && !!(sta & (s == "ejectableImpl" ? 
-            Capability.CDDOEJECT : Capability.CDDOCLOSE));
     }
     @property auto ejectable()
     {

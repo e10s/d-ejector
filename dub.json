@@ -8,8 +8,8 @@
 		"windows-headers": ">=1.0.1"
 	},
 	"libs-freebsd": ["cam"],
-	"preBuildCommands-freebsd": ["cd $PACKAGE_DIR/freebsd && cc -c cam_commander.c -o cam_commander.o"],
-	"dflags-freebsd": ["$PACKAGE_DIR/freebsd/cam_commander.o"],
+	"preBuildCommands-freebsd": ["cd $PACKAGE_DIR/freebsd && cc ccb.c -o ccb && ./ccb > ccb.mixin"],
+	"stringImportPaths-freebsd": ["freebsd"],
 	"targetType": "library",
 	"configurations": [
 		{
