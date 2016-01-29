@@ -406,24 +406,9 @@ struct Ejector
 
 version(Windows) private
 {
-    auto toStrZ(string s)
-    {
-        version(Unicode)
-        {
-            import std.utf : toUTF16z;
-            return s.toUTF16z;
-        }
-        else
-        {
-            import std.string : toStringz;
-            return s.toStringz;
-        }
-    }
-
-
-    import windows.winioctl;
-    import windows.winbase;
-    import windows.windef;
+    import core.sys.windows.winioctl;
+    import core.sys.windows.winbase;
+    import core.sys.windows.windef;
 
     // ntddscsi.h
     struct SCSI_PASS_THROUGH_DIRECT
@@ -537,11 +522,11 @@ struct Ejector
     {
         import std.algorithm : find, map;
         import std.ascii : uppercase;
-        import std.string : toStringz;
-        import windows.winbase : DRIVE_CDROM, GetDriveType;
+        import std.utf : toUTF16z;
+        import core.sys.windows.winbase : DRIVE_CDROM, GetDriveType;
 
         auto drives = uppercase.map!(a => (cast(char)a))
-            .find!(a => GetDriveType(toStrZ(a ~ `:\`)) == DRIVE_CDROM);
+            .find!(a => GetDriveType(toUTF16z(a ~ `:\`)) == DRIVE_CDROM);
         if (drives.empty)
         {
             return "";
@@ -569,10 +554,12 @@ struct Ejector
     }
     private auto createDriveHandle()
     {
+        import std.utf : toUTF16z;
+
         immutable drivePath = `\\.\` ~
             (drive == "" ? defaultDrive : drive) ~ ":";
 
-        auto h = CreateFile(drivePath.toStrZ, GENERIC_READ | GENERIC_WRITE,
+        auto h = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
 
         immutable err = GetLastError;
