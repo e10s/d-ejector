@@ -20,63 +20,26 @@ version (linux)
 
 version (linux) private
 {
+    import linux;
+
     enum Command
     {
         // scsi/sg.h
-        SG_IO = 0x2285,
+        SG_IO = .SG_IO,
 
         // linux/cdrom.h
-        CDROMEJECT = 0x5309,
-        CDROMCLOSETRAY = 0x5319,
-        CDROM_DRIVE_STATUS = 0x5326,
-        CDROM_GET_CAPABILITY = 0x5331,// Other members might be added
+        CDROMEJECT = .CDROMEJECT,
+        CDROMCLOSETRAY = .CDROMCLOSETRAY,
+        CDROM_DRIVE_STATUS = .CDROM_DRIVE_STATUS,
+        CDROM_GET_CAPABILITY = .CDROM_GET_CAPABILITY, // Other members might be added
     }
 
     // linux/cdrom.h
-    enum Status
-    {
-        CDS_NO_INFO,
-        CDS_NO_DISC,
-        CDS_TRAY_OPEN,
-        CDS_DRIVE_NOT_READY,
-        CDS_DISC_OK
-    }
-
     enum Capability
     {
-        CDC_CLOSE_TRAY = 0x1,
-        CDC_OPEN_TRAY = 0x2
+        CDC_CLOSE_TRAY = .CDC_CLOSE_TRAY,
+        CDC_OPEN_TRAY = .CDC_OPEN_TRAY
     }
-
-    // scsi/sg.h
-    struct sg_io_hdr
-    {
-        int interface_id;
-        int dxfer_direction;
-        ubyte cmd_len;
-        ubyte mx_sb_len;
-        ushort iovec_count;
-        uint dxfer_len;
-        void* dxferp;
-        ubyte* cmdp;
-        void* sbp;
-        uint timeout;
-        uint flags;
-        int pack_id;
-        void* usr_ptr;
-        ubyte status;
-        ubyte masked_status;
-        ubyte msg_status;
-        ubyte sb_len_wr;
-        ushort host_status;
-        ushort driver_status;
-        int resid;
-        uint duration;
-        uint info;
-    }
-
-    enum SG_INTERFACE_ID_ORIG = 'S';
-    enum SG_DXFER_FROM_DEV = -3;
 }
 
 version (FreeBSD)
@@ -252,9 +215,9 @@ version (Ejector_Posix) struct Ejector
         {
             int sta = -1;
             immutable r = send(Command.CDROM_DRIVE_STATUS, sta);
-            if (r && sta != Status.CDS_NO_INFO)
+            if (r && sta != CDS_NO_INFO)
             {
-                return sta == Status.CDS_TRAY_OPEN ?
+                return sta == CDS_TRAY_OPEN ?
                     TrayStatus.OPEN : TrayStatus.CLOSED;
             }
             else
@@ -590,8 +553,8 @@ version (Windows) struct Ejector
         ubyte[8] buf = padding; // Mechanism Status Header has 8 bytes
 
         SCSI_PASS_THROUGH_DIRECT sptd = {
-            Length: sptdSize,// PathId, TargetId and Lun are "don't-care" params:
-            // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
+            Length: sptdSize, // PathId, TargetId and Lun are "don't-care" params:
+                // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
             CdbLength: 12,
             DataIn: SCSI_IOCTL_DATA_IN,
             DataTransferLength: buf.length,
