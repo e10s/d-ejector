@@ -211,6 +211,7 @@ struct Ejector
         int sta;
         return send(cmd, sta);
     }
+    version(FreeBSD)
     private auto camCommander(in ubyte[] cmd, ref ubyte[] buf)
     {
         import core.sys.posix.fcntl : O_RDWR;
