@@ -8,16 +8,17 @@ module ejector;
 
 enum TrayStatus
 {
-    ERROR, OPEN, CLOSED
+    ERROR,
+    OPEN,
+    CLOSED
 }
 
-
-version(linux)
+version (linux)
 {
     version = Ejector_Posix;
 }
 
-version(linux) private
+version (linux) private
 {
     enum Command
     {
@@ -28,8 +29,7 @@ version(linux) private
         CDROMEJECT = 0x5309,
         CDROMCLOSETRAY = 0x5319,
         CDROM_DRIVE_STATUS = 0x5326,
-        CDROM_GET_CAPABILITY = 0x5331,
-        // Other members might be added
+        CDROM_GET_CAPABILITY = 0x5331,// Other members might be added
     }
 
     // linux/cdrom.h
@@ -79,14 +79,13 @@ version(linux) private
     enum SG_DXFER_FROM_DEV = -3;
 }
 
-
-version(FreeBSD)
+version (FreeBSD)
 {
     version = Ejector_Posix;
     pragma(lib, "cam");
 }
 
-version(FreeBSD) private
+version (FreeBSD) private
 {
     /*
         Generated from ccb.c
@@ -97,35 +96,32 @@ version(FreeBSD) private
     */
     mixin(import("ccb.mixin"));
 
-
     // cam/cam_ccb.h
     // https://github.com/freebsd/freebsd/blob/master/sys/cam/cam_ccb.h
     enum ccb_flags
     {
-	    CAM_DIR_IN = 0x00000040
+        CAM_DIR_IN = 0x00000040
     }
 
     union ccb;
     struct ccb_scsiio;
 
-    extern(C) int csio_build(ccb_scsiio*, ubyte*, uint, uint, int, int,
+    extern (C) int csio_build(ccb_scsiio*, ubyte*, uint, uint, int, int,
         const(char)*, ...);
-
 
     // camlib.h
     // https://github.com/freebsd/freebsd/blob/master/lib/libcam/camlib.h
     enum CAM_ERRBUF_SIZE = 2048;
     struct cam_device;
 
-    extern(C) __gshared ubyte[CAM_ERRBUF_SIZE] cam_errbuf;
-    extern(C) cam_device* cam_open_device(const(char)*, int);
-    extern(C) void cam_close_device(cam_device*);
-    extern(C) int cam_send_ccb(cam_device*, ccb*);
-
+    extern (C) __gshared ubyte[CAM_ERRBUF_SIZE] cam_errbuf;
+    extern (C) cam_device* cam_open_device(const(char)*, int);
+    extern (C) void cam_close_device(cam_device*);
+    extern (C) int cam_send_ccb(cam_device*, ccb*);
 
     // sys/ioccom.h
     // https://github.com/freebsd/freebsd/blob/master/sys/sys/ioccom.h
-    enum IOCPARM_SHIFT= 13;
+    enum IOCPARM_SHIFT = 13;
     enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
     enum IOC_VOID = 0x20000000;
     enum _IOC(uint inout_, uint group, uint num, uint len) =
@@ -148,32 +144,30 @@ version(FreeBSD) private
     }
 }
 
-
-version(Ejector_Posix)
-struct Ejector
+version (Ejector_Posix) struct Ejector
 {
-    version(linux)
+    version (linux)
     {
         private string drive = "/dev/cdrom";
     }
 
-    version(FreeBSD)
+    version (FreeBSD)
     {
         private string drive = "/dev/cd0";
     }
 
-
     private void logError(string msg, int errNo)
     {
-        debug(VerboseEjector)
+        debug (VerboseEjector)
         {
-            import core.stdc.string: strerror;
+            import core.stdc.string : strerror;
             import std.conv : text;
             import std.stdio : stderr, writeln;
 
             stderr.writeln(msg, ": ", errNo.strerror.text);
         }
     }
+
     private auto send(T)(Command cmd, ref int sta, T third)
     {
         import core.stdc.errno : errno;
@@ -183,7 +177,8 @@ struct Ejector
         import std.string : toStringz;
 
         immutable fd = open(drive.toStringz, O_NONBLOCK | O_RDONLY);
-        scope(exit) fd != -1 && close(fd);
+        scope (exit)
+            fd != -1 && close(fd);
 
         if (fd == -1)
         {
@@ -202,17 +197,19 @@ struct Ejector
 
         return true;
     }
+
     private auto send(Command cmd, ref int sta)
     {
         return send(cmd, sta, 0);
     }
+
     private auto send(Command cmd)
     {
         int sta;
         return send(cmd, sta);
     }
-    version(FreeBSD)
-    private auto camCommander(in ubyte[] cmd, ref ubyte[] buf)
+
+    version (FreeBSD) private auto camCommander(in ubyte[] cmd, ref ubyte[] buf)
     {
         import core.sys.posix.fcntl : O_RDWR;
         import std.string : toStringz;
@@ -221,23 +218,25 @@ struct Ejector
         if (!cam_dev)
         {
             import std.stdio : stderr, writeln;
-            stderr.writeln(cast(string)cam_errbuf);
+
+            stderr.writeln(cast(string) cam_errbuf);
             return false;
         }
 
-        ubyte[CCB_SIZE] ccbLike;  // substitute for union ccb
-        csio_build(cast(ccb_scsiio*)ccbLike.ptr, buf.ptr,
-            cast(uint)buf.length, ccb_flags.CAM_DIR_IN,
+        ubyte[CCB_SIZE] ccbLike; // substitute for union ccb
+        csio_build(cast(ccb_scsiio*) ccbLike.ptr, buf.ptr,
+            cast(uint) buf.length, ccb_flags.CAM_DIR_IN,
             1, 5000, "".toStringz);
-        ccbLike[CCB_CDB_LEN_OFFSET] = cast(ubyte)cmd.length;
+        ccbLike[CCB_CDB_LEN_OFFSET] = cast(ubyte) cmd.length;
         ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + cmd.length] =
             cmd[];
 
-        immutable csc = cam_send_ccb(cam_dev, cast(ccb*)ccbLike.ptr);
+        immutable csc = cam_send_ccb(cam_dev, cast(ccb*) ccbLike.ptr);
         if (csc == -1)
         {
             import std.stdio : stderr, writeln;
-            stderr.writeln(cast(string)cam_errbuf);
+
+            stderr.writeln(cast(string) cam_errbuf);
             cam_close_device(cam_dev);
             return false;
         }
@@ -246,9 +245,10 @@ struct Ejector
 
         return true;
     }
+
     @property auto status()
     {
-        version(linux)
+        version (linux)
         {
             int sta = -1;
             immutable r = send(Command.CDROM_DRIVE_STATUS, sta);
@@ -262,24 +262,24 @@ struct Ejector
                 return TrayStatus.ERROR;
             }
         }
-        version(FreeBSD)
+        version (FreeBSD)
         {
             enum MECHANISM_STATUS_CMD_LEN = 12;
             enum MECHANISM_STATUS_RESPONSE_BUF_LEN = 8;
 
             auto buf = new ubyte[MECHANISM_STATUS_RESPONSE_BUF_LEN];
-            static immutable ubyte[MECHANISM_STATUS_CMD_LEN]
-                mechanism_status_cmd =
+            static immutable ubyte[MECHANISM_STATUS_CMD_LEN] mechanism_status_cmd =
                 [0xBD, 0, 0, 0, 0, 0, 0, 0,
-                0, MECHANISM_STATUS_RESPONSE_BUF_LEN, 0, 0];
+                    0, MECHANISM_STATUS_RESPONSE_BUF_LEN, 0, 0];
 
             immutable r = camCommander(mechanism_status_cmd[], buf);
 
             if (r)
             {
-                debug(VerboseEjector)
+                debug (VerboseEjector)
                 {
                     import std.stdio : stderr, writeln;
+
                     stderr.writeln("status succeeded");
                 }
                 return buf[1] & 0b00010000 ?
@@ -287,59 +287,61 @@ struct Ejector
             }
             else
             {
-                debug(VerboseEjector)
+                debug (VerboseEjector)
                 {
                     import std.stdio : stderr, writeln;
+
                     stderr.writeln("status failed");
                 }
                 return TrayStatus.ERROR;
             }
         }
     }
-    @property private auto opDispatch(string s)()
-        if (s == "ejectableImpl" || s == "closableImpl")
+
+    @property private auto opDispatch(string s)() if (s == "ejectableImpl" || s == "closableImpl")
     {
         enum GET_CONFIGURATION_CMD_LEN = 12;
         enum GET_CONFIGURATION_RESPONSE_BUF_LEN = 16;
 
         auto buf = new ubyte[GET_CONFIGURATION_RESPONSE_BUF_LEN];
-        static immutable ubyte[GET_CONFIGURATION_CMD_LEN]
-            get_configuration_cmd =
+        static immutable ubyte[GET_CONFIGURATION_CMD_LEN] get_configuration_cmd =
             [0x46, 0x02, 0, 0x03, 0, 0, 0,
-            0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0];
+                0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0];
 
-        version(linux)
+        version (linux)
         {
             sg_io_hdr hdr = {
-                interface_id : SG_INTERFACE_ID_ORIG,
-                dxfer_direction : SG_DXFER_FROM_DEV,
-                cmd_len : GET_CONFIGURATION_CMD_LEN,
-                dxfer_len : GET_CONFIGURATION_RESPONSE_BUF_LEN,
-                dxferp : buf.ptr,
-                cmdp : cast(ubyte*)get_configuration_cmd.ptr,
-                sbp : null,
-                timeout : 5000
+                interface_id: SG_INTERFACE_ID_ORIG,
+                dxfer_direction: SG_DXFER_FROM_DEV,
+                cmd_len: GET_CONFIGURATION_CMD_LEN,
+                dxfer_len: GET_CONFIGURATION_RESPONSE_BUF_LEN,
+                dxferp: buf.ptr,
+                cmdp: cast(ubyte*) get_configuration_cmd.ptr,
+                sbp: null,
+                timeout: 5000
             };
 
             int sta;
             immutable r = send(Command.SG_IO, sta, &hdr);
         }
-        version(FreeBSD)
+        version (FreeBSD)
         {
             immutable r = camCommander(get_configuration_cmd[], buf);
         }
 
-        debug(VerboseEjector)
+        debug (VerboseEjector)
         {
             if (r)
             {
                 import std.stdio : stderr, writeln;
+
                 stderr.writeln(s, " succeeded");
             }
             else
             {
                 import std.stdio : stderr, writeln;
                 import std.conv : text;
+
                 stderr.writeln(s, " failed");
             }
         }
@@ -370,7 +372,7 @@ struct Ejector
             // Guess from the Loading Mechanism Type field
             // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
             // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-            else
+        else
             {
                 // The Loading Mechanism Type field
                 immutable mech = buf[12] >> 5;
@@ -379,33 +381,35 @@ struct Ejector
             }
         }
     }
+
     @property auto ejectable()
     {
         return this.ejectableImpl;
     }
+
     @property auto closable()
     {
         return this.closableImpl;
     }
+
     auto open()
     {
-        version(linux)
+        version (linux)
             return send(Command.CDROMEJECT);
-        version(FreeBSD)
+        version (FreeBSD)
             return send(Command.CDIOCEJECT);
     }
+
     auto closed()
     {
-        version(linux)
+        version (linux)
             return send(Command.CDROMCLOSETRAY);
-        version(FreeBSD)
+        version (FreeBSD)
             return send(Command.CDIOCCLOSE);
     }
 }
 
-
-
-version(Windows) private
+version (Windows) private
 {
     import core.sys.windows.winioctl;
     import core.sys.windows.winbase;
@@ -431,14 +435,12 @@ version(Windows) private
 
     alias IOCTL_SCSI_BASE = FILE_DEVICE_CONTROLLER;
     enum IOCTL_SCSI_PASS_THROUGH_DIRECT = CTL_CODE_T!(IOCTL_SCSI_BASE, 0x0405,
-        METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS);
+            METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS);
     enum SCSI_IOCTL_DATA_IN = 1;
-
 
     // scsi.h
     enum SCSIOP_MECHANISM_STATUS = UCHAR(0xBD);
     enum CDB12GENERIC_LENGTH = 12;
-
 
     // ntddmmc.h
     enum FEATURE_NUMBER
@@ -458,11 +460,12 @@ version(Windows) private
     {
         UCHAR[2] FeatureCode;
         import std.bitmanip : bitfields;
+
         mixin(bitfields!(
-            UCHAR, "Current", 1,
-            UCHAR, "Persistent", 1,
-            UCHAR, "Version" , 4,
-            UCHAR, "Reserved0", 2
+                UCHAR, "Current", 1,
+                UCHAR, "Persistent", 1,
+                UCHAR, "Version", 4,
+                UCHAR, "Reserved0", 2
         ));
         UCHAR AdditionalLength;
     }
@@ -471,13 +474,14 @@ version(Windows) private
     {
         FEATURE_HEADER Header;
         import std.bitmanip : bitfields;
+
         mixin(bitfields!(
-            UCHAR, "Lockable", 1,
-            UCHAR, "DBML", 1,  // If Version >= 2
-            UCHAR, "DefaultToPrevent", 1,
-            UCHAR, "Eject", 1,
-            UCHAR, "Load", 1,  // If Version >= 1
-            UCHAR, "LoadingMechanism", 3
+                UCHAR, "Lockable", 1,
+                UCHAR, "DBML", 1, // If Version >= 2
+                UCHAR, "DefaultToPrevent", 1,
+                UCHAR, "Eject", 1,
+                UCHAR, "Load", 1, // If Version >= 1
+                UCHAR, "LoadingMechanism", 3
         ));
         UCHAR[3] Reserved3;
     }
@@ -491,16 +495,13 @@ version(Windows) private
         PVOID[2] Reserved;
     }
 
-
     // ntddcdrm.h
     alias IOCTL_CDROM_BASE = FILE_DEVICE_CD_ROM;
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
-        METHOD_BUFFERED, FILE_READ_ACCESS);
+            METHOD_BUFFERED, FILE_READ_ACCESS);
 }
 
-
-version(Windows)
-struct Ejector
+version (Windows) struct Ejector
 {
     private string drive = "";
 
@@ -514,6 +515,7 @@ struct Ejector
             drive = driveLetter.toUpper;
         }
     }
+
     this(char driveLetter)
     {
         this(cast(string)[driveLetter]);
@@ -526,7 +528,7 @@ struct Ejector
         import std.utf : toUTF16z;
         import core.sys.windows.winbase : DRIVE_CDROM, GetDriveType;
 
-        auto drives = uppercase.map!(a => (cast(char)a))
+        auto drives = uppercase.map!(a => (cast(char) a))
             .find!(a => GetDriveType(toUTF16z(a ~ `:\`)) == DRIVE_CDROM);
         if (drives.empty)
         {
@@ -535,13 +537,14 @@ struct Ejector
         else
         {
             import std.conv : text;
+
             return drives.front.text;
         }
     }
 
     private void logError(string msg, uint errNo)
     {
-        debug(VerboseEjector)
+        debug (VerboseEjector)
         {
             import std.conv : text;
             import std.stdio : stderr, writeln;
@@ -553,6 +556,7 @@ struct Ejector
             stderr.writeln(msg, ": ", buf.ptr.text);
         }
     }
+
     private auto createDriveHandle()
     {
         import std.utf : toUTF16z;
@@ -565,14 +569,16 @@ struct Ejector
 
         immutable err = GetLastError;
         logError(`CreateFile("` ~ drivePath ~ `") ` ~
-            (err == 0 ? "succeeded" : "failed"), err);
+                (err == 0 ? "succeeded" : "failed"), err);
 
         return h;
     }
+
     @property auto status()
     {
         auto h = createDriveHandle();
-        scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
+        scope (exit)
+            h != INVALID_HANDLE_VALUE && CloseHandle(h);
 
         if (h == INVALID_HANDLE_VALUE)
         {
@@ -581,17 +587,16 @@ struct Ejector
 
         enum sptdSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
         enum padding = ubyte(255);
-        ubyte[8] buf = padding;  // Mechanism Status Header has 8 bytes
+        ubyte[8] buf = padding; // Mechanism Status Header has 8 bytes
 
         SCSI_PASS_THROUGH_DIRECT sptd = {
-            Length : sptdSize,
-            // PathId, TargetId and Lun are "don't-care" params:
+            Length: sptdSize,// PathId, TargetId and Lun are "don't-care" params:
             // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
-            CdbLength : 12,
-            DataIn : SCSI_IOCTL_DATA_IN,
-            DataTransferLength : buf.length,
-            TimeOutValue : 5,
-            DataBuffer : buf.ptr
+            CdbLength: 12,
+            DataIn: SCSI_IOCTL_DATA_IN,
+            DataTransferLength: buf.length,
+            TimeOutValue: 5,
+            DataBuffer: buf.ptr
         };
         sptd.Cdb[0] = SCSIOP_MECHANISM_STATUS;
         sptd.Cdb[9] = buf.length;
@@ -602,11 +607,12 @@ struct Ejector
 
         immutable err = GetLastError;
         logError("DeviceIoControl() " ~
-            (err == 0 ? "succeeded" : "failed"), err);
+                (err == 0 ? "succeeded" : "failed"), err);
 
-        debug(VerboseEjector)
+        debug (VerboseEjector)
         {
             import std.stdio : stderr, writeln;
+
             stderr.writeln(buf);
         }
 
@@ -620,11 +626,12 @@ struct Ejector
             return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;
         }
     }
-    @property private auto opDispatch(string s)()
-        if (s == "ejectableImpl" || s == "closableImpl")
+
+    @property private auto opDispatch(string s)() if (s == "ejectableImpl" || s == "closableImpl")
     {
         auto h = createDriveHandle();
-        scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
+        scope (exit)
+            h != INVALID_HANDLE_VALUE && CloseHandle(h);
 
         if (h == INVALID_HANDLE_VALUE)
         {
@@ -637,11 +644,12 @@ struct Ejector
         enum gchSize = DWORD(GCH.sizeof + FDRM.sizeof);
 
         GET_CONFIGURATION_IOCTL_INPUT gcii = {
-            Feature : FEATURE_NUMBER.FeatureRemovableMedium,
-            RequestType : SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
+            Feature: FEATURE_NUMBER.FeatureRemovableMedium,
+            RequestType: SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
         };
 
         import std.conv : emplace;
+
         auto pHolder = new void[gchSize];
         auto pGCH = emplace!GCH(pHolder);
         auto pFDRM = emplace!FDRM(pHolder[GCH.sizeof .. $]);
@@ -651,7 +659,7 @@ struct Ejector
             &gcii, gciiSize, pGCH, gchSize, &ret, null);
         immutable err = GetLastError;
         logError("DeviceIoControl() " ~
-            (err == 0 ? "succeeded" : "failed"), err);
+                (err == 0 ? "succeeded" : "failed"), err);
 
         if (!dic)
         {
@@ -659,10 +667,10 @@ struct Ejector
             return false;
         }
 
-
-        debug(VerboseEjector)
+        debug (VerboseEjector)
         {
             import std.stdio : stderr, writeln;
+
             stderr.writeln(*pGCH, *pFDRM);
         }
 
@@ -682,26 +690,29 @@ struct Ejector
             // [[ Doubtful ]]
             // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
             // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-            else
+        else
             {
                 // Maybe closable
                 return pFDRM.LoadingMechanism != 0;
             }
         }
     }
+
     @property auto ejectable()
     {
         return this.ejectableImpl;
     }
+
     @property auto closable()
     {
         return this.closableImpl;
     }
-    private auto opDispatch(string s)()
-        if (s == "openImpl" || s == "closedImpl")
+
+    private auto opDispatch(string s)() if (s == "openImpl" || s == "closedImpl")
     {
         auto h = createDriveHandle();
-        scope(exit) h != INVALID_HANDLE_VALUE && CloseHandle(h);
+        scope (exit)
+            h != INVALID_HANDLE_VALUE && CloseHandle(h);
 
         if (h == INVALID_HANDLE_VALUE)
         {
@@ -710,19 +721,21 @@ struct Ejector
 
         DWORD ret;
         enum cmd = s == "openImpl" ?
-            IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
+    IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
         immutable dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
         immutable err = GetLastError;
 
         logError("DeviceIoControl() " ~
-            (err == 0 ? "succeeded" : "failed"), err);
+                (err == 0 ? "succeeded" : "failed"), err);
 
         return !!dic;
     }
+
     auto open()
     {
         return this.openImpl;
     }
+
     auto closed()
     {
         return this.closedImpl;
