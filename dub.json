@@ -4,13 +4,17 @@
 	"copyright": "Copyright (C) 2015, electrolysis",
 	"license": "BSL-1.0",
 	"authors": ["electrolysis"],
+	"sourcePaths-windows": ["source-win"],
+	"importPaths-windows": ["source-win"],
+	"sourcePaths-posix": ["source-posix"],
+	"importPaths-posix": ["source-posix"],
 	"libs-freebsd": ["cam"],
 	"preBuildCommands-freebsd": ["cd $PACKAGE_DIR/freebsd && cc ccb.c -o ccb && ./ccb > ccb.mixin"],
 	"stringImportPaths-freebsd": ["freebsd"],
 	"targetType": "library",
 	"configurations": [
 		{
-			"name": "default",
+			"name": "default"
 		},
 		{
 			"name": "verbose",
