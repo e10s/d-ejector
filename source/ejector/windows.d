@@ -4,11 +4,11 @@ Distributed under the Boost Software License, Version 1.0.
 (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-module ejector_win;
+module ejector.windows;
 
-import ejector_base;
+import ejector.base;
 
-version (Windows) private
+version (Windows) package
 {
     import core.sys.windows.winioctl;
     import core.sys.windows.winbase;
@@ -98,29 +98,8 @@ version (Windows) private
     alias IOCTL_CDROM_BASE = FILE_DEVICE_CD_ROM;
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
             METHOD_BUFFERED, FILE_READ_ACCESS);
-}
 
-version (Windows) struct Ejector
-{
-    private string drive = "";
-
-    this(string driveLetter)
-    {
-        // "a" to "z" or "A" to "Z"
-        import std.uni : isAlpha, toUpper;
-
-        if (driveLetter.length == 1 && driveLetter[0].isAlpha)
-        {
-            drive = driveLetter.toUpper;
-        }
-    }
-
-    this(char driveLetter)
-    {
-        this(cast(string)[driveLetter]);
-    }
-
-    private @property auto defaultDrive()
+    @property auto defaultDrive()
     {
         import std.algorithm : find, map;
         import std.ascii : uppercase;
@@ -141,7 +120,7 @@ version (Windows) struct Ejector
         }
     }
 
-    private void logError(string msg, uint errNo)
+    void logError(string msg, uint errNo)
     {
         debug (VerboseEjector)
         {
@@ -156,12 +135,12 @@ version (Windows) struct Ejector
         }
     }
 
-    private auto createDriveHandle()
+    auto createDriveHandle(string driveLetter)
     {
         import std.utf : toUTF16z;
 
         immutable drivePath = `\\.\` ~
-            (drive == "" ? defaultDrive : drive) ~ ":";
+            (driveLetter == "" ? defaultDrive : driveLetter) ~ ":";
 
         auto h = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
@@ -173,9 +152,9 @@ version (Windows) struct Ejector
         return h;
     }
 
-    @property auto status()
+    auto statusImpl(string driveLetter)
     {
-        auto h = createDriveHandle();
+        auto h = createDriveHandle(driveLetter);
         scope (exit)
             h != INVALID_HANDLE_VALUE && CloseHandle(h);
 
@@ -226,9 +205,25 @@ version (Windows) struct Ejector
         }
     }
 
-    @property private auto opDispatch(string s)() if (s == "ejectableImpl" || s == "closableImpl")
+    enum Mode
     {
-        auto h = createDriveHandle();
+        open,
+        close
+    }
+
+    auto ejectableImpl(string driveLetter)
+    {
+        return ejectableClosableImpl!(Mode.open)(driveLetter);
+    }
+
+    auto closableImpl(string driveLetter)
+    {
+        return ejectableClosableImpl!(Mode.close)(driveLetter);
+    }
+
+    @property auto ejectableClosableImpl(Mode mode)(string driveLetter)
+    {
+        auto h = createDriveHandle(driveLetter);
         scope (exit)
             h != INVALID_HANDLE_VALUE && CloseHandle(h);
 
@@ -273,7 +268,7 @@ version (Windows) struct Ejector
             stderr.writeln(*pGCH, *pFDRM);
         }
 
-        static if (s == "ejectableImpl")
+        static if (mode == Mode.open)
         {
             // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
             // Test the Eject bit
@@ -297,19 +292,19 @@ version (Windows) struct Ejector
         }
     }
 
-    @property auto ejectable()
+    auto openImpl(string driveLetter)
     {
-        return this.ejectableImpl;
+        return openClosedImpl!(Mode.open)(driveLetter);
     }
 
-    @property auto closable()
+    auto closedImpl(string driveLetter)
     {
-        return this.closableImpl;
+        return openClosedImpl!(Mode.close)(driveLetter);
     }
 
-    private auto opDispatch(string s)() if (s == "openImpl" || s == "closedImpl")
+    auto openClosedImpl(Mode mode)(string driveLetter)
     {
-        auto h = createDriveHandle();
+        auto h = createDriveHandle(driveLetter);
         scope (exit)
             h != INVALID_HANDLE_VALUE && CloseHandle(h);
 
@@ -319,7 +314,7 @@ version (Windows) struct Ejector
         }
 
         DWORD ret;
-        enum cmd = s == "openImpl" ?
+        enum cmd = mode == Mode.open ?
     IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
         immutable dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
         immutable err = GetLastError;
@@ -328,15 +323,5 @@ version (Windows) struct Ejector
                 (err == 0 ? "succeeded" : "failed"), err);
 
         return !!dic;
-    }
-
-    auto open()
-    {
-        return this.openImpl;
-    }
-
-    auto closed()
-    {
-        return this.closedImpl;
     }
 }

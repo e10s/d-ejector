@@ -4,9 +4,9 @@ Distributed under the Boost Software License, Version 1.0.
 (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-module ejector_freebsd;
+module ejector.freebsd;
 
-import ejector_base;
+import ejector.base;
 
 version (FreeBSD)
 {
@@ -14,7 +14,7 @@ version (FreeBSD)
     pragma(lib, "cam");
 }
 
-version (FreeBSD) private
+version (FreeBSD) package
 {
     /*
         Generated from ccb.c
@@ -71,17 +71,8 @@ version (FreeBSD) private
         CDDOEJECT = 0x1,
         CDDOCLOSE = 0x2
     }
-}
 
-version (Ejector_Posix) struct Ejector
-{
-
-    version (FreeBSD)
-    {
-        private string drive = "/dev/cd0";
-    }
-
-    private void logError(string msg, int errNo)
+    void logError(string msg, int errNo)
     {
         debug (VerboseEjector)
         {
@@ -93,7 +84,7 @@ version (Ejector_Posix) struct Ejector
         }
     }
 
-    private auto send(T)(Command cmd, ref int sta, T third)
+    auto send(T)(string drive, Command cmd, ref int sta, T third)
     {
         import core.stdc.errno : errno;
         import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, open;
@@ -123,18 +114,18 @@ version (Ejector_Posix) struct Ejector
         return true;
     }
 
-    private auto send(Command cmd, ref int sta)
+    auto send(string drive, Command cmd, ref int sta)
     {
-        return send(cmd, sta, 0);
+        return send(drive, cmd, sta, 0);
     }
 
-    private auto send(Command cmd)
+    auto send(string drive, Command cmd)
     {
         int sta;
-        return send(cmd, sta);
+        return send(drive, cmd, sta);
     }
 
-    version (FreeBSD) private auto camCommander(in ubyte[] cmd, ref ubyte[] buf)
+    auto camCommander(string drive, in ubyte[] cmd, ref ubyte[] buf)
     {
         import core.sys.posix.fcntl : O_RDWR;
         import std.string : toStringz;
@@ -171,46 +162,59 @@ version (Ejector_Posix) struct Ejector
         return true;
     }
 
-    @property auto status()
+    auto statusImpl(string drive)
     {
+        enum MECHANISM_STATUS_CMD_LEN = 12;
+        enum MECHANISM_STATUS_RESPONSE_BUF_LEN = 8;
 
-        version (FreeBSD)
+        auto buf = new ubyte[MECHANISM_STATUS_RESPONSE_BUF_LEN];
+        static immutable ubyte[MECHANISM_STATUS_CMD_LEN] mechanism_status_cmd =
+            [0xBD, 0, 0, 0, 0, 0, 0, 0,
+                0, MECHANISM_STATUS_RESPONSE_BUF_LEN, 0, 0];
+
+        immutable r = camCommander(drive, mechanism_status_cmd[], buf);
+
+        if (r)
         {
-            enum MECHANISM_STATUS_CMD_LEN = 12;
-            enum MECHANISM_STATUS_RESPONSE_BUF_LEN = 8;
-
-            auto buf = new ubyte[MECHANISM_STATUS_RESPONSE_BUF_LEN];
-            static immutable ubyte[MECHANISM_STATUS_CMD_LEN] mechanism_status_cmd =
-                [0xBD, 0, 0, 0, 0, 0, 0, 0,
-                    0, MECHANISM_STATUS_RESPONSE_BUF_LEN, 0, 0];
-
-            immutable r = camCommander(mechanism_status_cmd[], buf);
-
-            if (r)
+            debug (VerboseEjector)
             {
-                debug (VerboseEjector)
-                {
-                    import std.stdio : stderr, writeln;
+                import std.stdio : stderr, writeln;
 
-                    stderr.writeln("status succeeded");
-                }
-                return buf[1] & 0b00010000 ?
-                    TrayStatus.OPEN : TrayStatus.CLOSED;
+                stderr.writeln("status succeeded");
             }
-            else
-            {
-                debug (VerboseEjector)
-                {
-                    import std.stdio : stderr, writeln;
-
-                    stderr.writeln("status failed");
-                }
-                return TrayStatus.ERROR;
-            }
+            return buf[1] & 0b00010000 ?
+                TrayStatus.OPEN : TrayStatus.CLOSED;
         }
+        else
+        {
+            debug (VerboseEjector)
+            {
+                import std.stdio : stderr, writeln;
+
+                stderr.writeln("status failed");
+            }
+            return TrayStatus.ERROR;
+        }
+
     }
 
-    @property private auto opDispatch(string s)() if (s == "ejectableImpl" || s == "closableImpl")
+    enum Mode
+    {
+        open,
+        close
+    }
+
+    auto ejectableImpl(string drive)
+    {
+        return ejectableClosableImpl!(Mode.open)(drive);
+    }
+
+    auto closableImpl(string drive)
+    {
+        return ejectableClosableImpl!(Mode.close)(drive);
+    }
+
+    @property auto ejectableClosableImpl(Mode mode)(string drive)
     {
         enum GET_CONFIGURATION_CMD_LEN = 12;
         enum GET_CONFIGURATION_RESPONSE_BUF_LEN = 16;
@@ -220,10 +224,7 @@ version (Ejector_Posix) struct Ejector
             [0x46, 0x02, 0, 0x03, 0, 0, 0,
                 0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0];
 
-        version (FreeBSD)
-        {
-            immutable r = camCommander(get_configuration_cmd[], buf);
-        }
+        immutable r = camCommander(drive, get_configuration_cmd[], buf);
 
         debug (VerboseEjector)
         {
@@ -231,14 +232,14 @@ version (Ejector_Posix) struct Ejector
             {
                 import std.stdio : stderr, writeln;
 
-                stderr.writeln(s, " succeeded");
+                stderr.writeln(mode, " succeeded");
             }
             else
             {
                 import std.stdio : stderr, writeln;
                 import std.conv : text;
 
-                stderr.writeln(s, " failed");
+                stderr.writeln(mode, " failed");
             }
         }
 
@@ -250,7 +251,7 @@ version (Ejector_Posix) struct Ejector
 
         // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
         // Test the Eject bit
-        static if (s == "ejectableImpl")
+        static if (mode == Mode.open)
         {
             immutable eject = buf[12] & 0b00001000;
             return !!eject;
@@ -278,25 +279,13 @@ version (Ejector_Posix) struct Ejector
         }
     }
 
-    @property auto ejectable()
+    auto openImpl(string drive)
     {
-        return this.ejectableImpl;
+        return send(drive, Command.CDIOCEJECT);
     }
 
-    @property auto closable()
+    auto closedImpl(string drive)
     {
-        return this.closableImpl;
-    }
-
-    auto open()
-    {
-        version (FreeBSD)
-            return send(Command.CDIOCEJECT);
-    }
-
-    auto closed()
-    {
-        version (FreeBSD)
-            return send(Command.CDIOCCLOSE);
+        return send(drive, Command.CDIOCCLOSE);
     }
 }
