@@ -14,10 +14,11 @@ version (Windows)
 }
 else version (linux)
 {
-    import ejector.linux;
-}else version (FreeBSD)
+    import ejector.posix;
+}
+else version (FreeBSD)
 {
-    import ejector.freebsd;
+    import ejector.posix;
 }
 ///
 struct Ejector
