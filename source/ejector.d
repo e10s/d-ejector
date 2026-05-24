@@ -15,6 +15,9 @@ version (Windows)
 else version (linux)
 {
     import ejector_linux;
+}else version (FreeBSD)
+{
+    import ejector_freebsd;
 }
 ///
 struct Ejector
