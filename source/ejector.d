@@ -7,8 +7,15 @@ Distributed under the Boost Software License, Version 1.0.
 module ejector;
 
 public import ejector_base;
-import ejector_win;
 
+version (Windows)
+{
+    import ejector_win;
+}
+else version (linux)
+{
+    import ejector_linux;
+}
 ///
 struct Ejector
 {
