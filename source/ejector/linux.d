@@ -4,9 +4,9 @@ Distributed under the Boost Software License, Version 1.0.
 (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-module ejector_linux;
+module ejector.linux;
 
-import ejector_base;
+import ejector.base;
 
 version (linux)
 {

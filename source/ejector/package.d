@@ -6,18 +6,18 @@ Distributed under the Boost Software License, Version 1.0.
 
 module ejector;
 
-public import ejector_base;
+public import ejector.base;
 
 version (Windows)
 {
-    import ejector_win;
+    import ejector.windows;
 }
 else version (linux)
 {
-    import ejector_linux;
+    import ejector.linux;
 }else version (FreeBSD)
 {
-    import ejector_freebsd;
+    import ejector.freebsd;
 }
 ///
 struct Ejector
