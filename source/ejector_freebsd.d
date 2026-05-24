@@ -232,14 +232,14 @@ version (FreeBSD)
             {
                 import std.stdio : stderr, writeln;
 
-                stderr.writeln(s, " succeeded");
+                stderr.writeln(mode, " succeeded");
             }
             else
             {
                 import std.stdio : stderr, writeln;
                 import std.conv : text;
 
-                stderr.writeln(s, " failed");
+                stderr.writeln(mode, " failed");
             }
         }
 
@@ -251,7 +251,7 @@ version (FreeBSD)
 
         // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
         // Test the Eject bit
-        static if (s == "ejectableImpl")
+        static if (mode == Mode.open)
         {
             immutable eject = buf[12] & 0b00001000;
             return !!eject;
