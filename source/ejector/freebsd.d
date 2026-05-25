@@ -75,6 +75,7 @@ version (FreeBSD)
             import core.sys.posix.fcntl : O_RDWR;
             import std.string : toStringz;
 
+            cam_errbuf[] = 0;
             auto cam_dev = cam_open_device(drive.toStringz, O_RDWR);
             if (!cam_dev)
             {
@@ -92,6 +93,7 @@ version (FreeBSD)
             ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + cmd.length] =
                 cmd[];
 
+            cam_errbuf[] = 0;
             immutable csc = cam_send_ccb(cam_dev, cast(ccb*) ccbLike.ptr);
             if (csc == -1)
             {
