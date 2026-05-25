@@ -54,16 +54,8 @@ version (linux)
             return ejectableClosableImpl!(Mode.close)(drive);
         }
 
-        auto ejectableClosableImpl(Mode mode)(string drive)
+        auto getConfiguration(string drive, ref ubyte[] buf)
         {
-            enum GET_CONFIGURATION_CMD_LEN = 12;
-            enum GET_CONFIGURATION_RESPONSE_BUF_LEN = 16;
-
-            auto buf = new ubyte[GET_CONFIGURATION_RESPONSE_BUF_LEN];
-            static immutable ubyte[GET_CONFIGURATION_CMD_LEN] get_configuration_cmd =
-                [0x46, 0x02, 0, 0x03, 0, 0, 0,
-                    0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0];
-
             sg_io_hdr hdr = {
                 interface_id: SG_INTERFACE_ID_ORIG,
                 dxfer_direction: SG_DXFER_FROM_DEV,
@@ -76,59 +68,12 @@ version (linux)
             };
 
             int sta;
-            immutable r = send(drive, Command.SG_IO, sta, &hdr);
+            return send(drive, Command.SG_IO, sta, &hdr);
+        }
 
-            debug (VerboseEjector)
-            {
-                if (r)
-                {
-                    import std.stdio : stderr, writeln;
-
-                    stderr.writeln(mode, " succeeded");
-                }
-                else
-                {
-                    import std.stdio : stderr, writeln;
-                    import std.conv : text;
-
-                    stderr.writeln(mode, " failed");
-                }
-            }
-
-            if (!r)
-            {
-                // We might have to execute MODE SENSE (10)
-                return false;
-            }
-
-            // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
-            // Test the Eject bit
-            static if (mode == Mode.open)
-            {
-                immutable eject = buf[12] & 0b00001000;
-                return !!eject;
-            }
-            else
-            {
-                // Test the Version field and the Load bit
-                immutable version_ = (buf[10] >> 2) & 0b00001111;
-                if (version_ > 0)
-                {
-                    immutable load = buf[12] & 0b00010000;
-                    return !!load;
-                }
-                // [[ Doubtful ]]
-                // Guess from the Loading Mechanism Type field
-                // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
-                // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-            else
-                {
-                    // The Loading Mechanism Type field
-                    immutable mech = buf[12] >> 5;
-                    // Maybe closable
-                    return mech != 0;
-                }
-            }
+        auto ejectableClosableImpl(Mode mode)(string drive)
+        {
+            return ejectableClosableCommon!(getConfiguration, mode)(drive);
         }
 
         auto openImpl(string drive)
