@@ -6,9 +6,7 @@ Distributed under the Boost Software License, Version 1.0.
 
 module ejector.windows;
 
-import ejector.base;
-
-version (Windows) package
+version (Windows) private
 {
     import core.sys.windows.winioctl;
     import core.sys.windows.winbase;
@@ -99,6 +97,7 @@ version (Windows) package
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
             METHOD_BUFFERED, FILE_READ_ACCESS);
 
+    // Select the first optical drive in alphabetical order.
     @property auto defaultDrive()
     {
         import std.algorithm : find, map;
@@ -120,21 +119,6 @@ version (Windows) package
         }
     }
 
-    void logError(string msg, uint errNo)
-    {
-        debug (VerboseEjector)
-        {
-            import std.conv : text;
-            import std.stdio : stderr, writeln;
-
-            char[512] buf;
-            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, null, errNo,
-                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                buf.ptr, buf.length, null);
-            stderr.writeln(msg, ": ", buf.ptr.text);
-        }
-    }
-
     auto createDriveHandle(string driveLetter)
     {
         import std.utf : toUTF16z;
@@ -152,76 +136,13 @@ version (Windows) package
         return h;
     }
 
-    auto statusImpl(string driveLetter)
-    {
-        auto h = createDriveHandle(driveLetter);
-        scope (exit)
-            h != INVALID_HANDLE_VALUE && CloseHandle(h);
-
-        if (h == INVALID_HANDLE_VALUE)
-        {
-            return TrayStatus.ERROR;
-        }
-
-        enum sptdSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
-        enum padding = ubyte(255);
-        ubyte[8] buf = padding; // Mechanism Status Header has 8 bytes
-
-        SCSI_PASS_THROUGH_DIRECT sptd = {
-            Length: sptdSize, // PathId, TargetId and Lun are "don't-care" params:
-                // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
-            CdbLength: 12,
-            DataIn: SCSI_IOCTL_DATA_IN,
-            DataTransferLength: buf.length,
-            TimeOutValue: 5,
-            DataBuffer: buf.ptr
-        };
-        sptd.Cdb[0] = SCSIOP_MECHANISM_STATUS;
-        sptd.Cdb[9] = buf.length;
-
-        DWORD ret;
-        immutable dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,
-            &sptd, sptdSize, &sptd, sptdSize, &ret, null);
-
-        immutable err = GetLastError;
-        logError("DeviceIoControl() " ~
-                (err == 0 ? "succeeded" : "failed"), err);
-
-        debug (VerboseEjector)
-        {
-            import std.stdio : stderr, writeln;
-
-            stderr.writeln(buf);
-        }
-
-        if (!dic || sptd.ScsiStatus != 0 || buf[1] == padding)
-        {
-            return TrayStatus.ERROR;
-        }
-        else
-        {
-            // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.742
-            return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;
-        }
-    }
-
     enum Mode
     {
         open,
         close
     }
 
-    auto ejectableImpl(string driveLetter)
-    {
-        return ejectableClosableImpl!(Mode.open)(driveLetter);
-    }
-
-    auto closableImpl(string driveLetter)
-    {
-        return ejectableClosableImpl!(Mode.close)(driveLetter);
-    }
-
-    @property auto ejectableClosableImpl(Mode mode)(string driveLetter)
+    auto ejectableClosableImpl(Mode mode)(string driveLetter)
     {
         auto h = createDriveHandle(driveLetter);
         scope (exit)
@@ -290,6 +211,89 @@ version (Windows) package
                 return pFDRM.LoadingMechanism != 0;
             }
         }
+    }
+}
+
+version (Windows) package
+{
+    void logError(string msg, uint errNo)
+    {
+        debug (VerboseEjector)
+        {
+            import std.conv : text;
+            import std.stdio : stderr, writeln;
+
+            char[512] buf;
+            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, null, errNo,
+                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                buf.ptr, buf.length, null);
+            stderr.writeln(msg, ": ", buf.ptr.text);
+        }
+    }
+
+    auto statusImpl(string driveLetter)
+    {
+        import ejector.base;
+
+        auto h = createDriveHandle(driveLetter);
+        scope (exit)
+            h != INVALID_HANDLE_VALUE && CloseHandle(h);
+
+        if (h == INVALID_HANDLE_VALUE)
+        {
+            return TrayStatus.ERROR;
+        }
+
+        enum sptdSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
+        enum padding = ubyte(255);
+        ubyte[8] buf = padding; // Mechanism Status Header has 8 bytes
+
+        SCSI_PASS_THROUGH_DIRECT sptd = {
+            Length: sptdSize, // PathId, TargetId and Lun are "don't-care" params:
+                // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
+            CdbLength: 12,
+            DataIn: SCSI_IOCTL_DATA_IN,
+            DataTransferLength: buf.length,
+            TimeOutValue: 5,
+            DataBuffer: buf.ptr
+        };
+        sptd.Cdb[0] = SCSIOP_MECHANISM_STATUS;
+        sptd.Cdb[9] = buf.length;
+
+        DWORD ret;
+        immutable dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,
+            &sptd, sptdSize, &sptd, sptdSize, &ret, null);
+
+        immutable err = GetLastError;
+        logError("DeviceIoControl() " ~
+                (err == 0 ? "succeeded" : "failed"), err);
+
+        debug (VerboseEjector)
+        {
+            import std.stdio : stderr, writeln;
+
+            stderr.writeln(buf);
+        }
+
+        if (!dic || sptd.ScsiStatus != 0 || buf[1] == padding)
+        {
+            return TrayStatus.ERROR;
+        }
+        else
+        {
+            // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.742
+            return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;
+        }
+    }
+
+    auto ejectableImpl(string driveLetter)
+    {
+        return ejectableClosableImpl!(Mode.open)(driveLetter);
+    }
+
+    auto closableImpl(string driveLetter)
+    {
+        return ejectableClosableImpl!(Mode.close)(driveLetter);
     }
 
     auto openImpl(string driveLetter)
