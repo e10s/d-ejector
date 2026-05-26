@@ -4,14 +4,14 @@ import ejector.base;
 version (linux)
 {
     version = Ejector_Posix;
-    import ejector.linux, linux;
+    import ejector.posix.linux, linux;
 
     mixin LinuxImpl;
 }
 version (FreeBSD)
 {
     version = Ejector_Posix;
-    import ejector.freebsd;
+    import ejector.posix.freebsd;
 
     mixin FreeBSDImpl;
 }
