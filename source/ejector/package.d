@@ -72,8 +72,8 @@ struct Ejector
         return openImpl(drive);
     }
     ///
-    auto closed()
+    auto close()
     {
-        return closedImpl(drive);
+        return closeImpl(drive);
     }
 }

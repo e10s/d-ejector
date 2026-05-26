@@ -294,15 +294,15 @@ version (Windows) package
 
     auto openImpl(string driveLetter)
     {
-        return openClosedImpl!(Mode.open)(driveLetter);
+        return openCloseImpl!(Mode.open)(driveLetter);
     }
 
-    auto closedImpl(string driveLetter)
+    auto closeImpl(string driveLetter)
     {
-        return openClosedImpl!(Mode.close)(driveLetter);
+        return openCloseImpl!(Mode.close)(driveLetter);
     }
 
-    auto openClosedImpl(Mode mode)(string driveLetter)
+    auto openCloseImpl(Mode mode)(string driveLetter)
     {
         auto h = createDriveHandle(driveLetter);
         scope (exit)

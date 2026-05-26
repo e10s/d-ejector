@@ -26,7 +26,7 @@ void main()
         auto status = e[1].status;
         if (status == TrayStatus.OPEN)
         {
-            e[1].closed();
+            e[1].close();
         }
         else if (status == TrayStatus.CLOSED)
         {
@@ -56,7 +56,7 @@ void main()
         auto status = e[1].status;
         if (status == TrayStatus.OPEN)
         {
-            e[1].closed();
+            e[1].close();
         }
         else if (status == TrayStatus.CLOSED)
         {
@@ -85,7 +85,7 @@ void main()
         auto status = e.status;
         if (status == TrayStatus.OPEN)
         {
-            e.closed();
+            e.close();
         }
         else if (status == TrayStatus.CLOSED)
         {

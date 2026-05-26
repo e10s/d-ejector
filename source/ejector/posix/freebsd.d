@@ -170,7 +170,7 @@ version (FreeBSD)
             return send(drive, Command.CDIOCEJECT);
         }
 
-        auto closedImpl(string drive)
+        auto closeImpl(string drive)
         {
             return send(drive, Command.CDIOCCLOSE);
         }

@@ -81,7 +81,7 @@ version (linux)
             return send(drive, Command.CDROMEJECT);
         }
 
-        auto closedImpl(string drive)
+        auto closeImpl(string drive)
         {
             return send(drive, Command.CDROMCLOSETRAY);
         }
