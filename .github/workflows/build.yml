@@ -1,16 +1,16 @@
-name: Build
+name: DUB Build
 on: [push, pull_request]
 
 jobs:
     build:
-        name: Dub Build (${{ matrix.os }} - ${{ matrix.dc }})
+        name: ${{ matrix.os }} - ${{ matrix.dc }}
         strategy:
             fail-fast: false
             matrix:
-                os: [ubuntu-latest, windows-latest]
+                os: [ubuntu-slim, windows-latest]
                 dc: [dmd, ldc]
                 include:
-                    - { os: ubuntu-latest, dc: gdc }
+                    - { os: ubuntu-slim, dc: gdc }
         runs-on: ${{ matrix.os }}
         steps:
             - name: Checkout
