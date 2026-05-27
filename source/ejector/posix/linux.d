@@ -10,29 +10,10 @@ version (linux)
 {
     package mixin template LinuxImpl()
     {
-        private enum Command
-        {
-            // scsi/sg.h
-            SG_IO = .SG_IO,
-
-            // linux/cdrom.h
-            CDROMEJECT = .CDROMEJECT,
-            CDROMCLOSETRAY = .CDROMCLOSETRAY,
-            CDROM_DRIVE_STATUS = .CDROM_DRIVE_STATUS,
-            CDROM_GET_CAPABILITY = .CDROM_GET_CAPABILITY, // Other members might be added
-        }
-
-        // linux/cdrom.h
-        private enum Capability
-        {
-            CDC_CLOSE_TRAY = .CDC_CLOSE_TRAY,
-            CDC_OPEN_TRAY = .CDC_OPEN_TRAY
-        }
-
         auto statusImpl(string drive)
         {
             int sta = -1;
-            immutable r = send(drive, Command.CDROM_DRIVE_STATUS, sta);
+            immutable r = send(drive, CDROM_DRIVE_STATUS, sta);
             if (r && sta != CDS_NO_INFO)
             {
                 return sta == CDS_TRAY_OPEN ?
@@ -68,7 +49,7 @@ version (linux)
             };
 
             int sta;
-            return send(drive, Command.SG_IO, sta, &hdr);
+            return send(drive, SG_IO, sta, &hdr);
         }
 
         private auto ejectableClosableImpl(Mode mode)(string drive)
@@ -78,12 +59,12 @@ version (linux)
 
         auto openImpl(string drive)
         {
-            return send(drive, Command.CDROMEJECT);
+            return send(drive, CDROMEJECT);
         }
 
         auto closeImpl(string drive)
         {
-            return send(drive, Command.CDROMCLOSETRAY);
+            return send(drive, CDROMCLOSETRAY);
         }
     }
 }

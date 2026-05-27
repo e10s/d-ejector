@@ -63,13 +63,6 @@ version (FreeBSD)
             CDIOCCLOSE = _IO!('c', 28),
         }
 
-        // sys/cdio.h
-        private enum Capability
-        {
-            CDDOEJECT = 0x1,
-            CDDOCLOSE = 0x2
-        }
-
         private auto camCommander(string drive, in ubyte[] cmd, ref ubyte[] buf)
         {
             import core.sys.posix.fcntl : O_RDWR;
