@@ -212,6 +212,29 @@ version (Windows) private
             }
         }
     }
+
+    auto openCloseImpl(Mode mode)(string driveLetter)
+    {
+        auto h = createDriveHandle(driveLetter);
+        scope (exit)
+            h != INVALID_HANDLE_VALUE && CloseHandle(h);
+
+        if (h == INVALID_HANDLE_VALUE)
+        {
+            return false;
+        }
+
+        DWORD ret;
+        enum cmd = mode == Mode.open ?
+    IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
+        immutable dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
+        immutable err = GetLastError;
+
+        logError("DeviceIoControl() " ~
+                (err == 0 ? "succeeded" : "failed"), err);
+
+        return !!dic;
+    }
 }
 
 version (Windows) package
@@ -304,28 +327,5 @@ version (Windows) package
     auto closeImpl(string driveLetter)
     {
         return openCloseImpl!(Mode.close)(driveLetter);
-    }
-
-    auto openCloseImpl(Mode mode)(string driveLetter)
-    {
-        auto h = createDriveHandle(driveLetter);
-        scope (exit)
-            h != INVALID_HANDLE_VALUE && CloseHandle(h);
-
-        if (h == INVALID_HANDLE_VALUE)
-        {
-            return false;
-        }
-
-        DWORD ret;
-        enum cmd = mode == Mode.open ?
-    IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
-        immutable dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
-        immutable err = GetLastError;
-
-        logError("DeviceIoControl() " ~
-                (err == 0 ? "succeeded" : "failed"), err);
-
-        return !!dic;
     }
 }
