@@ -21,56 +21,56 @@ version (FreeBSD)
         enum CCB_CDB_LEN_OFFSET = ??;
         enum CCB_CDB_BYTES_OFFSET = ??;
         */
-        mixin(import("ccb.mixin"));
+        private mixin(import("ccb.mixin"));
 
         // cam/cam_ccb.h
         // https://github.com/freebsd/freebsd/blob/master/sys/cam/cam_ccb.h
-        enum ccb_flags
+        private enum ccb_flags
         {
             CAM_DIR_IN = 0x00000040
         }
 
-        union ccb;
-        struct ccb_scsiio;
+        private union ccb;
+        private struct ccb_scsiio;
 
-        extern (C) int csio_build(ccb_scsiio*, ubyte*, uint, uint, int, int,
+        private extern (C) int csio_build(ccb_scsiio*, ubyte*, uint, uint, int, int,
             const(char)*, ...);
 
         // camlib.h
         // https://github.com/freebsd/freebsd/blob/master/lib/libcam/camlib.h
-        enum CAM_ERRBUF_SIZE = 2048;
-        struct cam_device;
+        private enum CAM_ERRBUF_SIZE = 2048;
+        private struct cam_device;
 
-        extern (C) __gshared ubyte[CAM_ERRBUF_SIZE] cam_errbuf;
-        extern (C) cam_device* cam_open_device(const(char)*, int);
-        extern (C) void cam_close_device(cam_device*);
-        extern (C) int cam_send_ccb(cam_device*, ccb*);
+        private extern (C) __gshared ubyte[CAM_ERRBUF_SIZE] cam_errbuf;
+        private extern (C) cam_device* cam_open_device(const(char)*, int);
+        private extern (C) void cam_close_device(cam_device*);
+        private extern (C) int cam_send_ccb(cam_device*, ccb*);
 
         // sys/ioccom.h
         // https://github.com/freebsd/freebsd/blob/master/sys/sys/ioccom.h
-        enum IOCPARM_SHIFT = 13;
-        enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
-        enum IOC_VOID = 0x20000000;
-        enum _IOC(uint inout_, uint group, uint num, uint len) =
+        private enum IOCPARM_SHIFT = 13;
+        private enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
+        private enum IOC_VOID = 0x20000000;
+        private enum _IOC(uint inout_, uint group, uint num, uint len) =
             uint(inout_ | ((len & IOCPARM_MASK) << 16) | (group << 8) | num);
-        enum _IO(uint g, uint n) = _IOC!(IOC_VOID, g, n, 0);
+        private enum _IO(uint g, uint n) = _IOC!(IOC_VOID, g, n, 0);
 
         // sys/cdio.h
         // https://github.com/freebsd/freebsd/blob/master/sys/sys/cdio.h
-        enum Command
+        private enum Command
         {
             CDIOCEJECT = _IO!('c', 24),
             CDIOCCLOSE = _IO!('c', 28),
         }
 
         // sys/cdio.h
-        enum Capability
+        private enum Capability
         {
             CDDOEJECT = 0x1,
             CDDOCLOSE = 0x2
         }
 
-        auto camCommander(string drive, in ubyte[] cmd, ref ubyte[] buf)
+        private auto camCommander(string drive, in ubyte[] cmd, ref ubyte[] buf)
         {
             import core.sys.posix.fcntl : O_RDWR;
             import std.string : toStringz;
@@ -155,12 +155,12 @@ version (FreeBSD)
             return ejectableClosableImpl!(Mode.close)(drive);
         }
 
-        auto getConfiguration(string drive, ref ubyte[] buf)
+        private auto getConfiguration(string drive, ref ubyte[] buf)
         {
             return camCommander(drive, get_configuration_cmd[], buf);
         }
 
-        auto ejectableClosableImpl(Mode mode)(string drive)
+        private auto ejectableClosableImpl(Mode mode)(string drive)
         {
             return ejectableClosableCommon!(getConfiguration, mode)(drive);
         }
