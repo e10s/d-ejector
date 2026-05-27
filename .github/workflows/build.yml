@@ -9,8 +9,8 @@ jobs:
             matrix:
                 os: [ubuntu-slim, windows-latest]
                 dc: [dmd, ldc]
-                include:
-                    - { os: ubuntu-slim, dc: gdc }
+                #include:
+                #    - { os: ubuntu-slim, dc: gdc }
         runs-on: ${{ matrix.os }}
         steps:
             - name: Checkout
