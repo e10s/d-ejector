@@ -16,7 +16,7 @@ version (FreeBSD)
     mixin FreeBSDImpl;
 }
 
-version (Ejector_Posix) package
+version (Ejector_Posix) private
 {
     enum Mode
     {

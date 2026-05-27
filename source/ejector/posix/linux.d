@@ -10,7 +10,7 @@ version (linux)
 {
     package mixin template LinuxImpl()
     {
-        enum Command
+        private enum Command
         {
             // scsi/sg.h
             SG_IO = .SG_IO,
@@ -23,7 +23,7 @@ version (linux)
         }
 
         // linux/cdrom.h
-        enum Capability
+        private enum Capability
         {
             CDC_CLOSE_TRAY = .CDC_CLOSE_TRAY,
             CDC_OPEN_TRAY = .CDC_OPEN_TRAY
@@ -54,7 +54,7 @@ version (linux)
             return ejectableClosableImpl!(Mode.close)(drive);
         }
 
-        auto getConfiguration(string drive, ref ubyte[] buf)
+        private auto getConfiguration(string drive, ref ubyte[] buf)
         {
             sg_io_hdr hdr = {
                 interface_id: SG_INTERFACE_ID_ORIG,
@@ -71,7 +71,7 @@ version (linux)
             return send(drive, Command.SG_IO, sta, &hdr);
         }
 
-        auto ejectableClosableImpl(Mode mode)(string drive)
+        private auto ejectableClosableImpl(Mode mode)(string drive)
         {
             return ejectableClosableCommon!(getConfiguration, mode)(drive);
         }
