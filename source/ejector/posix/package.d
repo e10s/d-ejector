@@ -18,11 +18,23 @@ version (FreeBSD)
 
 version (Ejector_Posix) private
 {
+
     enum Mode
     {
         open,
         close
     }
+
+    enum IoctlErrorStage
+    {
+        none,
+        open,
+        ioctl
+    }
+
+    import std.typecons : Tuple;
+
+    alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNo");
 
     void logError(string msg, int errNo)
     {
@@ -36,7 +48,7 @@ version (Ejector_Posix) private
         }
     }
 
-    auto send(Command, T)(string drive, Command cmd, ref int sta, T third)
+    IoctlResult ioctlWrapper(Command, T)(string drive, Command cmd, ref int sta, T third)
     {
         import core.stdc.errno : errno;
         import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, open;
@@ -50,31 +62,33 @@ version (Ejector_Posix) private
 
         if (fd == -1)
         {
-            logError("open failed, " ~ drive, errno);
-            return false;
+            immutable err = errno;
+            logError("open failed, " ~ drive, err);
+            return IoctlResult(false, IoctlErrorStage.open, err);
         }
 
         sta = ioctl(fd, cmd, third);
         if (sta == -1)
         {
-            logError("ioctl failed, " ~ drive, errno);
-            return false;
+            immutable err = errno;
+            logError("ioctl failed, " ~ drive, err);
+            return IoctlResult(false, IoctlErrorStage.ioctl, err);
         }
 
         logError("ioctl succeeded, " ~ drive, 0);
 
-        return true;
+        return IoctlResult(true, IoctlErrorStage.none, 0);
     }
 
-    auto send(Command)(string drive, Command cmd, ref int sta)
+    IoctlResult ioctlWrapper(Command)(string drive, Command cmd, ref int sta)
     {
-        return send(drive, cmd, sta, 0);
+        return ioctlWrapper(drive, cmd, sta, 0);
     }
 
-    auto send(Command)(string drive, Command cmd)
+    IoctlResult ioctlWrapper(Command)(string drive, Command cmd)
     {
         int sta;
-        return send(drive, cmd, sta);
+        return ioctlWrapper(drive, cmd, sta);
     }
 
     enum GET_CONFIGURATION_CMD_LEN = 12;
@@ -124,7 +138,7 @@ version (Ejector_Posix) private
         {
             import std.stdio : stderr, writeln;
 
-            if (r)
+            if (r.ok)
             {
                 stderr.writeln(mode, " succeeded");
             }
@@ -134,7 +148,7 @@ version (Ejector_Posix) private
             }
         }
 
-        if (!r)
+        if (!r.ok)
         {
             // We might have to execute MODE SENSE (10)
             return false;

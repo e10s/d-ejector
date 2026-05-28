@@ -13,8 +13,8 @@ version (linux)
         auto statusImpl(string drive)
         {
             int sta = -1;
-            immutable r = send(drive, CDROM_DRIVE_STATUS, sta);
-            if (r && sta != CDS_NO_INFO)
+            immutable r = ioctlWrapper(drive, CDROM_DRIVE_STATUS, sta);
+            if (r.ok && sta != CDS_NO_INFO)
             {
                 return sta == CDS_TRAY_OPEN ?
                     TrayStatus.OPEN : TrayStatus.CLOSED;
@@ -49,7 +49,7 @@ version (linux)
             };
 
             int sta;
-            return send(drive, SG_IO, sta, &hdr);
+            return ioctlWrapper(drive, SG_IO, sta, &hdr);
         }
 
         private auto ejectableClosableImpl(Mode mode)(string drive)
@@ -59,12 +59,12 @@ version (linux)
 
         auto openImpl(string drive)
         {
-            return send(drive, CDROMEJECT);
+            return ioctlWrapper(drive, CDROMEJECT).ok;
         }
 
         auto closeImpl(string drive)
         {
-            return send(drive, CDROMCLOSETRAY);
+            return ioctlWrapper(drive, CDROMCLOSETRAY).ok;
         }
     }
 }

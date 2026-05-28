@@ -160,12 +160,12 @@ version (FreeBSD)
 
         auto openImpl(string drive)
         {
-            return send(drive, Command.CDIOCEJECT);
+            return ioctlWrapper(drive, Command.CDIOCEJECT).ok;
         }
 
         auto closeImpl(string drive)
         {
-            return send(drive, Command.CDIOCCLOSE);
+            return ioctlWrapper(drive, Command.CDIOCCLOSE).ok;
         }
     }
 }
