@@ -19,7 +19,7 @@ version (FreeBSD)
 version (Ejector_Posix) private
 {
 
-    enum Mode
+    enum OpenCloseMode
     {
         open,
         close
@@ -98,11 +98,11 @@ version (Ejector_Posix) private
         [0x46, 0x02, 0, 0x03, 0, 0, 0,
             0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0];
 
-    bool parseEjectableClosable(Mode mode)(in ubyte[] buf)
+    bool parseEjectableClosable(OpenCloseMode mode)(in ubyte[] buf)
     {
         // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
         // Test the Eject bit
-        static if (mode == Mode.open)
+        static if (mode == OpenCloseMode.open)
         {
             immutable eject = buf[12] & 0b00001000;
             return !!eject;
@@ -129,7 +129,7 @@ version (Ejector_Posix) private
         }
     }
 
-    bool ejectableClosableCommon(alias sendGetConfiguration, Mode mode)(string drive)
+    bool ejectableClosableCommon(alias sendGetConfiguration, OpenCloseMode mode)(string drive)
     {
         auto buf = new ubyte[GET_CONFIGURATION_RESPONSE_BUF_LEN];
         immutable r = sendGetConfiguration(drive, buf);

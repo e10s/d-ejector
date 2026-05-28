@@ -27,12 +27,12 @@ version (linux)
 
         auto ejectableImpl(string drive)
         {
-            return ejectableClosableImpl!(Mode.open)(drive);
+            return ejectableClosableImpl!(OpenCloseMode.open)(drive);
         }
 
         auto closableImpl(string drive)
         {
-            return ejectableClosableImpl!(Mode.close)(drive);
+            return ejectableClosableImpl!(OpenCloseMode.close)(drive);
         }
 
         private auto getConfiguration(string drive, ref ubyte[] buf)
@@ -52,7 +52,7 @@ version (linux)
             return ioctlWrapper(drive, SG_IO, sta, &hdr);
         }
 
-        private auto ejectableClosableImpl(Mode mode)(string drive)
+        private auto ejectableClosableImpl(OpenCloseMode mode)(string drive)
         {
             return ejectableClosableCommon!(getConfiguration, mode)(drive);
         }
