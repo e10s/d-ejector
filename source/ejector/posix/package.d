@@ -140,11 +140,11 @@ version (Ejector_Posix) private
 
             if (r.ok)
             {
-                stderr.writeln(mode, " succeeded");
+                stderr.writeln("get configuration succeeded, ", drive);
             }
             else
             {
-                stderr.writeln(mode, " failed");
+                stderr.writeln("get configuration failed, ", drive);
             }
         }
 
