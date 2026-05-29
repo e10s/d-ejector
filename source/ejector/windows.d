@@ -5,6 +5,7 @@ Distributed under the Boost Software License, Version 1.0.
 */
 
 module ejector.windows;
+import ejector.base;
 
 version (Windows) private
 {
@@ -136,13 +137,7 @@ version (Windows) private
         return h;
     }
 
-    enum Mode
-    {
-        open,
-        close
-    }
-
-    auto ejectableClosableImpl(Mode mode)(string driveLetter)
+    auto ejectableClosableImpl(OpenCloseMode mode)(string driveLetter)
     {
         auto h = createDriveHandle(driveLetter);
         scope (exit)
@@ -189,7 +184,7 @@ version (Windows) private
             stderr.writeln(*pGCH, *pFDRM);
         }
 
-        static if (mode == Mode.open)
+        static if (mode == OpenCloseMode.open)
         {
             // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
             // Test the Eject bit
@@ -213,7 +208,7 @@ version (Windows) private
         }
     }
 
-    auto openCloseImpl(Mode mode)(string driveLetter)
+    auto openCloseImpl(OpenCloseMode mode)(string driveLetter)
     {
         auto h = createDriveHandle(driveLetter);
         scope (exit)
@@ -225,7 +220,7 @@ version (Windows) private
         }
 
         DWORD ret;
-        enum cmd = mode == Mode.open ?
+        enum cmd = mode == OpenCloseMode.open ?
     IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
         immutable dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
         immutable err = GetLastError;
@@ -311,21 +306,21 @@ version (Windows) package
 
     auto ejectableImpl(string driveLetter)
     {
-        return ejectableClosableImpl!(Mode.open)(driveLetter);
+        return ejectableClosableImpl!(OpenCloseMode.open)(driveLetter);
     }
 
     auto closableImpl(string driveLetter)
     {
-        return ejectableClosableImpl!(Mode.close)(driveLetter);
+        return ejectableClosableImpl!(OpenCloseMode.close)(driveLetter);
     }
 
     auto openImpl(string driveLetter)
     {
-        return openCloseImpl!(Mode.open)(driveLetter);
+        return openCloseImpl!(OpenCloseMode.open)(driveLetter);
     }
 
     auto closeImpl(string driveLetter)
     {
-        return openCloseImpl!(Mode.close)(driveLetter);
+        return openCloseImpl!(OpenCloseMode.close)(driveLetter);
     }
 }

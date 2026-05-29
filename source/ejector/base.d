@@ -12,3 +12,9 @@ enum TrayStatus
     OPEN,
     CLOSED
 }
+
+package enum OpenCloseMode
+{
+    open,
+    close
+}

@@ -18,13 +18,6 @@ version (FreeBSD)
 
 version (Ejector_Posix) private
 {
-
-    enum OpenCloseMode
-    {
-        open,
-        close
-    }
-
     enum IoctlErrorStage
     {
         none,
