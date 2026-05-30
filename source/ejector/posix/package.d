@@ -84,15 +84,15 @@ version (Ejector_Posix) private
         return ioctlWrapper(drive, cmd, sta);
     }
 
-    enum GET_CONFIGURATION_CMD_LEN = 12;
-    enum GET_CONFIGURATION_RESPONSE_BUF_LEN = 16;
+    enum GET_CONFIGURATION_CMD_LEN = 10;
 
     static immutable ubyte[GET_CONFIGURATION_CMD_LEN] get_configuration_cmd =
         [0x46, 0x02, 0, 0x03, 0, 0, 0,
-            0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0];
+            0, RemovableMediumFeature.sizeof, 0];
 
-    bool parseEjectableClosable(OpenCloseMode mode)(RemovableMediumFeatureDescriptor buf)
+    bool parseEjectableClosable(OpenCloseMode mode)(RemovableMediumFeature buf)
     {
+
         // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
         // Test the Eject bit
         static if (mode == OpenCloseMode.open)
@@ -119,7 +119,7 @@ version (Ejector_Posix) private
 
     bool ejectableClosableCommon(alias sendGetConfiguration, OpenCloseMode mode)(string drive)
     {
-        auto buf = RemovableMediumFeatureDescriptor();
+        auto buf = RemovableMediumFeature();
         immutable r = sendGetConfiguration(drive, buf);
 
         debug (VerboseEjector)
@@ -129,6 +129,8 @@ version (Ejector_Posix) private
             if (r.ok)
             {
                 stderr.writeln("get configuration succeeded, ", drive);
+                                stderr.writeln(buf);
+
             }
             else
             {

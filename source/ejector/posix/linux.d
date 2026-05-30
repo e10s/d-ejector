@@ -35,13 +35,13 @@ version (linux)
             return ejectableClosableImpl!(OpenCloseMode.close)(drive);
         }
 
-        private auto getConfiguration(string drive, ref RemovableMediumFeatureDescriptor buf)
+        private auto getConfiguration(string drive, ref RemovableMediumFeature buf)
         {
             sg_io_hdr hdr = {
                 interface_id: SG_INTERFACE_ID_ORIG,
                 dxfer_direction: SG_DXFER_FROM_DEV,
                 cmd_len: GET_CONFIGURATION_CMD_LEN,
-                dxfer_len: GET_CONFIGURATION_RESPONSE_BUF_LEN,
+                dxfer_len: RemovableMediumFeature.sizeof,
                 dxferp: &buf,
                 cmdp: cast(ubyte*) get_configuration_cmd.ptr,
                 sbp: null,

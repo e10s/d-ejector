@@ -21,6 +21,13 @@ package enum OpenCloseMode
 
 import std.bitmanip : bitfields;
 
+private mixin template FeatureHeader()
+{
+    ubyte[4] dataLength;
+    ubyte[2] reserved2;
+    ubyte[2] currentProfile;
+}
+
 private mixin template FeatureDescriptorHead()
 {
     ubyte[2] featureCode;
@@ -46,8 +53,9 @@ private mixin template RemovableMediumFeatureDescriptorData()
     ubyte[3] reserved3;
 }
 
-package struct RemovableMediumFeatureDescriptor
+package struct RemovableMediumFeature
 {
+    mixin FeatureHeader;
     mixin FeatureDescriptorHead;
     mixin RemovableMediumFeatureDescriptorData;
 }
