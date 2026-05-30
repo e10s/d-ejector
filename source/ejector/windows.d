@@ -36,16 +36,13 @@ version (Windows) private
             METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS);
     enum SCSI_IOCTL_DATA_IN = 1;
 
-    // scsi.h
-    enum SCSIOP_MECHANISM_STATUS = UCHAR(0xBD);
-    enum CDB12GENERIC_LENGTH = 12;
-
     // ntddmmc.h
     enum FEATURE_NUMBER
     {
         FeatureRemovableMedium = 0x0003
     }
 
+    /*
     struct GET_CONFIGURATION_HEADER
     {
         UCHAR[4] DataLength;
@@ -83,6 +80,7 @@ version (Windows) private
         ));
         UCHAR[3] Reserved3;
     }
+    */
 
     enum SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE = 0x2;
 
@@ -148,25 +146,19 @@ version (Windows) private
             return false;
         }
 
-        alias GCH = GET_CONFIGURATION_HEADER;
-        alias FDRM = FEATURE_DATA_REMOVABLE_MEDIUM;
         enum gciiSize = DWORD(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
-        enum gchSize = DWORD(GCH.sizeof + FDRM.sizeof);
-
         GET_CONFIGURATION_IOCTL_INPUT gcii = {
             Feature: FEATURE_NUMBER.FeatureRemovableMedium,
             RequestType: SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
         };
 
-        import std.conv : emplace;
-
-        auto pHolder = new void[gchSize];
-        auto pGCH = emplace!GCH(pHolder);
-        auto pFDRM = emplace!FDRM(pHolder[GCH.sizeof .. $]);
+        // Same as GET_CONFIGURATION_HEADER + FEATURE_DATA_REMOVABLE_MEDIUM
+        enum responseSize = DWORD(RemovableMediumFeatureResponse.sizeof);
+        auto response = RemovableMediumFeatureResponse();
 
         DWORD ret;
         immutable dic = DeviceIoControl(h, IOCTL_CDROM_GET_CONFIGURATION,
-            &gcii, gciiSize, pGCH, gchSize, &ret, null);
+            &gcii, gciiSize, &response, responseSize, &ret, null);
         immutable err = GetLastError;
         logError("DeviceIoControl() " ~
                 (err == 0 ? "succeeded" : "failed"), err);
@@ -181,31 +173,10 @@ version (Windows) private
         {
             import std.stdio : stderr, writeln;
 
-            stderr.writeln(*pGCH, *pFDRM);
+            stderr.writeln(response);
         }
 
-        static if (mode == OpenCloseMode.open)
-        {
-            // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
-            // Test the Eject bit
-            return !!pFDRM.Eject;
-        }
-        else
-        {
-            // Test the Version field and the Load bit
-            if (pFDRM.Header.Version > 0)
-            {
-                return !!pFDRM.Load;
-            }
-            // [[ Doubtful ]]
-            // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
-            // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-        else
-            {
-                // Maybe closable
-                return pFDRM.LoadingMechanism != 0;
-            }
-        }
+        return parseEjectableClosable!mode(response);
     }
 
     auto openCloseImpl(OpenCloseMode mode)(string driveLetter)
@@ -263,20 +234,21 @@ version (Windows) package
         }
 
         enum sptdSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
-        enum padding = ubyte(255);
-        ubyte[8] buf = padding; // Mechanism Status Header has 8 bytes
 
+        auto mechanismStatusHeader = MechanismStatusHeader();
         SCSI_PASS_THROUGH_DIRECT sptd = {
             Length: sptdSize, // PathId, TargetId and Lun are "don't-care" params:
                 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
-            CdbLength: 12,
+            CdbLength: MechanismStatusCDB.sizeof,
             DataIn: SCSI_IOCTL_DATA_IN,
-            DataTransferLength: buf.length,
+            DataTransferLength: MechanismStatusHeader.sizeof,
             TimeOutValue: 5,
-            DataBuffer: buf.ptr
+            DataBuffer: &mechanismStatusHeader
         };
-        sptd.Cdb[0] = SCSIOP_MECHANISM_STATUS;
-        sptd.Cdb[9] = buf.length;
+
+        import core.lifetime : emplace;
+
+        emplace!MechanismStatusCDB(sptd.Cdb[], mechanismStatusCDB);
 
         DWORD ret;
         immutable dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,
@@ -290,17 +262,16 @@ version (Windows) package
         {
             import std.stdio : stderr, writeln;
 
-            stderr.writeln(buf);
+            stderr.writeln(mechanismStatusHeader);
         }
 
-        if (!dic || sptd.ScsiStatus != 0 || buf[1] == padding)
+        if (!dic || sptd.ScsiStatus != 0)
         {
             return TrayStatus.ERROR;
         }
         else
         {
-            // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.742
-            return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;
+            return parseStatus(mechanismStatusHeader);
         }
     }
 

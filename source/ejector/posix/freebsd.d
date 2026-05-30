@@ -63,8 +63,9 @@ version (FreeBSD)
             CDIOCCLOSE = _IO!('c', 28),
         }
 
-        private auto camCommander(string drive, in ubyte[] cmd, ref ubyte[] buf)
+        private auto camCommander(CDB, Response)(string drive, CDB cdb, ref Response response)
         {
+            import core.stdc.errno : errno;
             import core.sys.posix.fcntl : O_RDWR;
             import std.string : toStringz;
 
@@ -74,17 +75,20 @@ version (FreeBSD)
             {
                 import std.stdio : stderr, writeln;
 
+                immutable err = errno;
+
                 stderr.writeln(cast(string) cam_errbuf);
-                return false;
+                return IoctlResult(false, IoctlErrorStage.open, err);
             }
 
             ubyte[CCB_SIZE] ccbLike; // substitute for union ccb
-            csio_build(cast(ccb_scsiio*) ccbLike.ptr, buf.ptr,
-                cast(uint) buf.length, ccb_flags.CAM_DIR_IN,
+            csio_build(cast(ccb_scsiio*) ccbLike.ptr, cast(ubyte*)&response,
+                uint(Response.sizeof), ccb_flags.CAM_DIR_IN,
                 1, 5000, "".toStringz);
-            ccbLike[CCB_CDB_LEN_OFFSET] = cast(ubyte) cmd.length;
-            ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + cmd.length] =
-                cmd[];
+            ccbLike[CCB_CDB_LEN_OFFSET] = ubyte(CDB.sizeof);
+            import core.lifetime : emplace;
+
+            emplace!CDB(ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + CDB.sizeof], cdb);
 
             cam_errbuf[] = 0;
             immutable csc = cam_send_ccb(cam_dev, cast(ccb*) ccbLike.ptr);
@@ -92,29 +96,24 @@ version (FreeBSD)
             {
                 import std.stdio : stderr, writeln;
 
+                immutable err = errno;
+
                 stderr.writeln(cast(string) cam_errbuf);
                 cam_close_device(cam_dev);
-                return false;
+                return IoctlResult(false, IoctlErrorStage.ioctl, err);
             }
 
             cam_close_device(cam_dev);
 
-            return true;
+            return IoctlResult(true, IoctlErrorStage.none, 0);
         }
 
         auto statusImpl(string drive)
         {
-            enum MECHANISM_STATUS_CMD_LEN = 12;
-            enum MECHANISM_STATUS_RESPONSE_BUF_LEN = 8;
+            auto mechanismStatusHeader = MechanismStatusHeader();
+            immutable r = camCommander(drive, mechanismStatusCDB, mechanismStatusHeader);
 
-            auto buf = new ubyte[MECHANISM_STATUS_RESPONSE_BUF_LEN];
-            static immutable ubyte[MECHANISM_STATUS_CMD_LEN] mechanism_status_cmd =
-                [0xBD, 0, 0, 0, 0, 0, 0, 0,
-                    0, MECHANISM_STATUS_RESPONSE_BUF_LEN, 0, 0];
-
-            immutable r = camCommander(drive, mechanism_status_cmd[], buf);
-
-            if (r)
+            if (r.ok)
             {
                 debug (VerboseEjector)
                 {
@@ -122,8 +121,7 @@ version (FreeBSD)
 
                     stderr.writeln("status succeeded");
                 }
-                return buf[1] & 0b00010000 ?
-                    TrayStatus.OPEN : TrayStatus.CLOSED;
+                return parseStatus(mechanismStatusHeader);
             }
             else
             {
@@ -135,7 +133,6 @@ version (FreeBSD)
                 }
                 return TrayStatus.ERROR;
             }
-
         }
 
         auto ejectableImpl(string drive)
@@ -148,9 +145,9 @@ version (FreeBSD)
             return ejectableClosableImpl!(OpenCloseMode.close)(drive);
         }
 
-        private auto getConfiguration(string drive, ref ubyte[] buf)
+        private auto getConfiguration(string drive, ref RemovableMediumFeatureResponse buf)
         {
-            return camCommander(drive, get_configuration_cmd[], buf);
+            return camCommander(drive, getConfigurationCDB, buf);
         }
 
         private auto ejectableClosableImpl(OpenCloseMode mode)(string drive)

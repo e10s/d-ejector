@@ -84,47 +84,15 @@ version (Ejector_Posix) private
         return ioctlWrapper(drive, cmd, sta);
     }
 
-    enum GET_CONFIGURATION_CMD_LEN = 12;
-    enum GET_CONFIGURATION_RESPONSE_BUF_LEN = 16;
-
-    static immutable ubyte[GET_CONFIGURATION_CMD_LEN] get_configuration_cmd =
-        [0x46, 0x02, 0, 0x03, 0, 0, 0,
-            0, GET_CONFIGURATION_RESPONSE_BUF_LEN, 0, 0, 0];
-
-    bool parseEjectableClosable(OpenCloseMode mode)(in ubyte[] buf)
-    {
-        // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
-        // Test the Eject bit
-        static if (mode == OpenCloseMode.open)
-        {
-            immutable eject = buf[12] & 0b00001000;
-            return !!eject;
-        }
-        else
-        {
-            // Test the Version field and the Load bit
-            immutable version_ = (buf[10] >> 2) & 0b00001111;
-            if (version_ > 0)
-            {
-                immutable load = buf[12] & 0b00010000;
-                return !!load;
-            }
-
-            // [[ Doubtful ]]
-            // Guess from the Loading Mechanism Type field
-            // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
-            // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-
-            // The Loading Mechanism Type field
-            immutable mech = buf[12] >> 5;
-            // Maybe closable
-            return mech != 0;
-        }
-    }
+    static immutable GetConfigurationCDB getConfigurationCDB = {
+        rt: 0x02,
+        startingFeatureNumber: [0, 0x03],
+        allocationLength: [0, RemovableMediumFeatureResponse.sizeof],
+    };
 
     bool ejectableClosableCommon(alias sendGetConfiguration, OpenCloseMode mode)(string drive)
     {
-        auto buf = new ubyte[GET_CONFIGURATION_RESPONSE_BUF_LEN];
+        auto buf = RemovableMediumFeatureResponse();
         immutable r = sendGetConfiguration(drive, buf);
 
         debug (VerboseEjector)
@@ -134,6 +102,7 @@ version (Ejector_Posix) private
             if (r.ok)
             {
                 stderr.writeln("get configuration succeeded, ", drive);
+                stderr.writeln(buf);
             }
             else
             {
