@@ -19,6 +19,18 @@ package enum OpenCloseMode
     close
 }
 
+package struct GetConfigurationCmd
+{
+    ubyte operationCode = 0x46;
+    ubyte rt;
+    ubyte[2] startingFeatureNumber;
+    ubyte[3] reserved3;
+    ubyte[2] allocationLength;
+    ubyte control;
+}
+
+static assert(GetConfigurationCmd.sizeof == 10);
+
 import std.bitmanip : bitfields;
 
 private mixin template FeatureHeader()
@@ -53,9 +65,11 @@ private mixin template RemovableMediumFeatureDescriptorData()
     ubyte[3] reserved3;
 }
 
-package struct RemovableMediumFeature
+package struct RemovableMediumFeatureResponse
 {
     mixin FeatureHeader;
     mixin FeatureDescriptorHead;
     mixin RemovableMediumFeatureDescriptorData;
 }
+
+static assert(RemovableMediumFeatureResponse.sizeof == 16);
