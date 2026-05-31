@@ -180,28 +180,7 @@ version (Windows) private
             stderr.writeln(response);
         }
 
-        static if (mode == OpenCloseMode.open)
-        {
-            // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
-            // Test the Eject bit
-            return !!response.eject;
-        }
-        else
-        {
-            // Test the Version field and the Load bit
-            if (response.version_ > 0)
-            {
-                return !!response.load;
-            }
-            // [[ Doubtful ]]
-            // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
-            // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-        else
-            {
-                // Maybe closable
-                return response.loadingMechanismType != 0;
-            }
-        }
+        return parseEjectableClosable!mode(response);
     }
 
     auto openCloseImpl(OpenCloseMode mode)(string driveLetter)

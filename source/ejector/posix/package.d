@@ -90,33 +90,6 @@ version (Ejector_Posix) private
         allocationLength: [0, RemovableMediumFeatureResponse.sizeof],
     };
 
-    bool parseEjectableClosable(OpenCloseMode mode)(RemovableMediumFeatureResponse buf)
-    {
-
-        // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
-        // Test the Eject bit
-        static if (mode == OpenCloseMode.open)
-        {
-            return !!buf.eject;
-        }
-        else
-        {
-            // Test the Version field and the Load bit
-            if (buf.version_ > 0)
-            {
-                return !!buf.load;
-            }
-
-            // [[ Doubtful ]]
-            // Guess from the Loading Mechanism Type field
-            // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
-            // https://github.com/torvalds/linux/blob/master/drivers/scsi/sr.c
-
-            // Maybe closable
-            return buf.loadingMechanismType != 0;
-        }
-    }
-
     bool ejectableClosableCommon(alias sendGetConfiguration, OpenCloseMode mode)(string drive)
     {
         auto buf = RemovableMediumFeatureResponse();
