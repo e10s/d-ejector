@@ -19,12 +19,11 @@ package enum OpenCloseMode
     close
 }
 
-// SCSI Command Descriptor Blocks
-
+// MMC-6 Command Descriptor Blocks
 
 package struct GetConfigurationCDB
 {
-    ubyte operationCode = 0x46;
+    immutable ubyte operationCode = 0x46;
     ubyte rt;
     ubyte[2] startingFeatureNumber;
     ubyte[3] reserved3;
@@ -33,6 +32,20 @@ package struct GetConfigurationCDB
 }
 
 static assert(GetConfigurationCDB.sizeof == 10);
+
+package struct MechanismStatusCDB
+{
+    immutable ubyte operationCode = 0xBD;
+    ubyte[7] reserved7;
+    ubyte[2] allocationLength;
+    ubyte reserved;
+    ubyte control;
+}
+
+static assert(MechanismStatusCDB.sizeof == 12);
+immutable MechanismStatusCDB msCDB = {allocationLength: [0, MechanismStatusHeader.sizeof]};
+
+// MMC-6 Command Response Data Structures
 
 import std.bitmanip : bitfields;
 
@@ -76,6 +89,26 @@ package struct RemovableMediumFeatureResponse
 }
 
 static assert(RemovableMediumFeatureResponse.sizeof == 16);
+
+package struct MechanismStatusHeader
+{
+    mixin(bitfields!(
+            ubyte, "currentSlotLow5", 5,
+            ubyte, "changerState", 2,
+            ubyte, "fault", 1,
+    ));
+    mixin(bitfields!(
+            ubyte, "currentSlotHigh3", 3,
+            ubyte, "reserved0", 1,
+            ubyte, "doorOpen", 1,
+            ubyte, "mechanismState", 3,
+    ));
+    ubyte[3] currentLBA;
+    ubyte numberOfSlotsAvailable;
+    ubyte[2] lengthOfSlotTables;
+}
+
+static assert(MechanismStatusHeader.sizeof == 8);
 
 package bool parseEjectableClosable(OpenCloseMode mode)(RemovableMediumFeatureResponse response)
 {

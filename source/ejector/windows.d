@@ -238,20 +238,21 @@ version (Windows) package
         }
 
         enum sptdSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
-        enum padding = ubyte(255);
-        ubyte[8] buf = padding; // Mechanism Status Header has 8 bytes
 
+        auto mechanismStatusHeader = MechanismStatusHeader();
         SCSI_PASS_THROUGH_DIRECT sptd = {
             Length: sptdSize, // PathId, TargetId and Lun are "don't-care" params:
                 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
-            CdbLength: 12,
+            CdbLength: MechanismStatusCDB.sizeof,
             DataIn: SCSI_IOCTL_DATA_IN,
-            DataTransferLength: buf.length,
+            DataTransferLength: MechanismStatusHeader.sizeof,
             TimeOutValue: 5,
-            DataBuffer: buf.ptr
+            DataBuffer: &mechanismStatusHeader
         };
-        sptd.Cdb[0] = SCSIOP_MECHANISM_STATUS;
-        sptd.Cdb[9] = buf.length;
+
+        import core.lifetime : emplace;
+
+        emplace!MechanismStatusCDB(sptd.Cdb[], msCDB);
 
         DWORD ret;
         immutable dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,
@@ -265,17 +266,17 @@ version (Windows) package
         {
             import std.stdio : stderr, writeln;
 
-            stderr.writeln(buf);
+            stderr.writeln(mechanismStatusHeader);
         }
 
-        if (!dic || sptd.ScsiStatus != 0 || buf[1] == padding)
+        if (!dic || sptd.ScsiStatus != 0)
         {
             return TrayStatus.ERROR;
         }
         else
         {
             // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.742
-            return (buf[1] & 0b00010000) ? TrayStatus.OPEN : TrayStatus.CLOSED;
+            return mechanismStatusHeader.doorOpen ? TrayStatus.OPEN : TrayStatus.CLOSED;
         }
     }
 
