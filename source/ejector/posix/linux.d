@@ -43,7 +43,7 @@ version (linux)
                 cmd_len: GetConfigurationCDB.sizeof,
                 dxfer_len: RemovableMediumFeatureResponse.sizeof,
                 dxferp: &buf,
-                cmdp: cast(ubyte*)&rmfCmd,
+                cmdp: cast(ubyte*)&getConfigurationCDB,
                 sbp: null,
                 timeout: 5000
             };
