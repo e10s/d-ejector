@@ -84,7 +84,7 @@ version (Ejector_Posix) private
         return ioctlWrapper(drive, cmd, sta);
     }
 
-    static immutable GetConfigurationCmd rmfCmd = {
+    static immutable GetConfigurationCDB rmfCmd = {
         rt: 0x02,
         startingFeatureNumber: [0, 0x03],
         allocationLength: [0, RemovableMediumFeatureResponse.sizeof],

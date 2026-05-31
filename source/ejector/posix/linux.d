@@ -40,7 +40,7 @@ version (linux)
             sg_io_hdr hdr = {
                 interface_id: SG_INTERFACE_ID_ORIG,
                 dxfer_direction: SG_DXFER_FROM_DEV,
-                cmd_len: GetConfigurationCmd.sizeof,
+                cmd_len: GetConfigurationCDB.sizeof,
                 dxfer_len: RemovableMediumFeatureResponse.sizeof,
                 dxferp: &buf,
                 cmdp: cast(ubyte*)&rmfCmd,

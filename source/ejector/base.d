@@ -19,7 +19,10 @@ package enum OpenCloseMode
     close
 }
 
-package struct GetConfigurationCmd
+// SCSI Command Descriptor Blocks
+
+
+package struct GetConfigurationCDB
 {
     ubyte operationCode = 0x46;
     ubyte rt;
@@ -29,7 +32,7 @@ package struct GetConfigurationCmd
     ubyte control;
 }
 
-static assert(GetConfigurationCmd.sizeof == 10);
+static assert(GetConfigurationCDB.sizeof == 10);
 
 import std.bitmanip : bitfields;
 
