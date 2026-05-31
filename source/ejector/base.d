@@ -110,6 +110,8 @@ package struct MechanismStatusHeader
 
 static assert(MechanismStatusHeader.sizeof == 8);
 
+// Goodies
+
 package bool parseEjectableClosable(OpenCloseMode mode)(RemovableMediumFeatureResponse response)
 {
 
@@ -135,4 +137,10 @@ package bool parseEjectableClosable(OpenCloseMode mode)(RemovableMediumFeatureRe
         // Maybe closable
         return response.loadingMechanismType != 0;
     }
+}
+
+package TrayStatus parseStatus(MechanismStatusHeader mechanismStatusHeader)
+{
+    // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.742
+    return mechanismStatusHeader.doorOpen ? TrayStatus.OPEN : TrayStatus.CLOSED;
 }

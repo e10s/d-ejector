@@ -275,8 +275,7 @@ version (Windows) package
         }
         else
         {
-            // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.742
-            return mechanismStatusHeader.doorOpen ? TrayStatus.OPEN : TrayStatus.CLOSED;
+            return parseStatus(mechanismStatusHeader);
         }
     }
 

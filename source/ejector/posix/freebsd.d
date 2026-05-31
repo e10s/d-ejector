@@ -121,8 +121,7 @@ version (FreeBSD)
 
                     stderr.writeln("status succeeded");
                 }
-                return mechanismStatusHeader.doorOpen ?
-                    TrayStatus.OPEN : TrayStatus.CLOSED;
+                return parseStatus(mechanismStatusHeader);
             }
             else
             {
@@ -134,7 +133,6 @@ version (FreeBSD)
                 }
                 return TrayStatus.ERROR;
             }
-
         }
 
         auto ejectableImpl(string drive)
