@@ -46,6 +46,7 @@ version (Windows) private
         FeatureRemovableMedium = 0x0003
     }
 
+    /*
     struct GET_CONFIGURATION_HEADER
     {
         UCHAR[4] DataLength;
@@ -83,6 +84,7 @@ version (Windows) private
         ));
         UCHAR[3] Reserved3;
     }
+    */
 
     enum SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE = 0x2;
 
@@ -148,25 +150,19 @@ version (Windows) private
             return false;
         }
 
-        alias GCH = GET_CONFIGURATION_HEADER;
-        alias FDRM = FEATURE_DATA_REMOVABLE_MEDIUM;
         enum gciiSize = DWORD(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
-        enum gchSize = DWORD(GCH.sizeof + FDRM.sizeof);
-
         GET_CONFIGURATION_IOCTL_INPUT gcii = {
             Feature: FEATURE_NUMBER.FeatureRemovableMedium,
             RequestType: SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
         };
 
-        import std.conv : emplace;
-
-        auto pHolder = new void[gchSize];
-        auto pGCH = emplace!GCH(pHolder);
-        auto pFDRM = emplace!FDRM(pHolder[GCH.sizeof .. $]);
+        // Same as GET_CONFIGURATION_HEADER + FEATURE_DATA_REMOVABLE_MEDIUM
+        enum responseSize = DWORD(RemovableMediumFeatureResponse.sizeof);
+        auto response = RemovableMediumFeatureResponse();
 
         DWORD ret;
         immutable dic = DeviceIoControl(h, IOCTL_CDROM_GET_CONFIGURATION,
-            &gcii, gciiSize, pGCH, gchSize, &ret, null);
+            &gcii, gciiSize, &response, responseSize, &ret, null);
         immutable err = GetLastError;
         logError("DeviceIoControl() " ~
                 (err == 0 ? "succeeded" : "failed"), err);
@@ -181,21 +177,21 @@ version (Windows) private
         {
             import std.stdio : stderr, writeln;
 
-            stderr.writeln(*pGCH, *pFDRM);
+            stderr.writeln(response);
         }
 
         static if (mode == OpenCloseMode.open)
         {
             // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
             // Test the Eject bit
-            return !!pFDRM.Eject;
+            return !!response.eject;
         }
         else
         {
             // Test the Version field and the Load bit
-            if (pFDRM.Header.Version > 0)
+            if (response.version_ > 0)
             {
-                return !!pFDRM.Load;
+                return !!response.load;
             }
             // [[ Doubtful ]]
             // Drives other than ones with caddy/slot type loading mechanism will be closable(?)
@@ -203,7 +199,7 @@ version (Windows) private
         else
             {
                 // Maybe closable
-                return pFDRM.LoadingMechanism != 0;
+                return response.loadingMechanismType != 0;
             }
         }
     }
