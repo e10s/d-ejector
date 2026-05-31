@@ -63,7 +63,7 @@ version (FreeBSD)
             CDIOCCLOSE = _IO!('c', 28),
         }
 
-        private auto camCommander(CDB, Response)(string drive, CDB cmd, ref Response buf)
+        private auto camCommander(CDB, Response)(string drive, CDB cdb, ref Response response)
         {
             import core.stdc.errno : errno;
             import core.sys.posix.fcntl : O_RDWR;
@@ -82,13 +82,13 @@ version (FreeBSD)
             }
 
             ubyte[CCB_SIZE] ccbLike; // substitute for union ccb
-            csio_build(cast(ccb_scsiio*) ccbLike.ptr, cast(ubyte*)&buf,
+            csio_build(cast(ccb_scsiio*) ccbLike.ptr, cast(ubyte*)&response,
                 uint(Response.sizeof), ccb_flags.CAM_DIR_IN,
                 1, 5000, "".toStringz);
             ccbLike[CCB_CDB_LEN_OFFSET] = ubyte(CDB.sizeof);
             import core.lifetime : emplace;
 
-            emplace!CDB(ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + CDB.sizeof], cmd);
+            emplace!CDB(ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + CDB.sizeof], cdb);
 
             cam_errbuf[] = 0;
             immutable csc = cam_send_ccb(cam_dev, cast(ccb*) ccbLike.ptr);
@@ -111,7 +111,7 @@ version (FreeBSD)
         auto statusImpl(string drive)
         {
             auto mechanismStatusHeader = MechanismStatusHeader();
-            immutable r = camCommander(drive, msCDB, mechanismStatusHeader);
+            immutable r = camCommander(drive, mechanismStatusCDB, mechanismStatusHeader);
 
             if (r.ok)
             {

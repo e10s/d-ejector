@@ -252,7 +252,7 @@ version (Windows) package
 
         import core.lifetime : emplace;
 
-        emplace!MechanismStatusCDB(sptd.Cdb[], msCDB);
+        emplace!MechanismStatusCDB(sptd.Cdb[], mechanismStatusCDB);
 
         DWORD ret;
         immutable dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,

@@ -43,7 +43,7 @@ package struct MechanismStatusCDB
 }
 
 static assert(MechanismStatusCDB.sizeof == 12);
-immutable MechanismStatusCDB msCDB = {allocationLength: [0, MechanismStatusHeader.sizeof]};
+immutable MechanismStatusCDB mechanismStatusCDB = {allocationLength: [0, MechanismStatusHeader.sizeof]};
 
 // MMC-6 Command Response Data Structures
 
