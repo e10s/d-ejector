@@ -63,20 +63,20 @@ version (FreeBSD)
             CDIOCCLOSE = _IO!('c', 28),
         }
 
-        private auto camCommander(CDB, Response)(string drive, CDB cdb, ref Response response)
+        private auto camCommander(CDB, Response)(string drivePathName, CDB cdb, ref Response response)
         {
             import core.stdc.errno : errno;
             import core.sys.posix.fcntl : O_RDWR;
             import std.string : toStringz;
 
             cam_errbuf[] = 0;
-            auto cam_dev = cam_open_device(drive.toStringz, O_RDWR);
+            auto camDevice = cam_open_device(drivePathName.toStringz, O_RDWR);
             scope (exit)
-                cam_dev && cam_close_device(cam_dev);
+                camDevice && cam_close_device(camDevice);
 
-            if (!cam_dev)
+            if (!camDevice)
             {
-                logGeneric("cam_open_device failed, " ~ drive, cast(string) cam_errbuf);
+                logGeneric("cam_open_device failed, " ~ drivePathName, cast(string) cam_errbuf);
                 return IoctlResult(false, IoctlErrorStage.open, 0);
             }
 
@@ -90,28 +90,28 @@ version (FreeBSD)
             emplace!CDB(ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + CDB.sizeof], cdb);
 
             cam_errbuf[] = 0;
-            immutable csc = cam_send_ccb(cam_dev, cast(ccb*) ccbLike.ptr);
-            if (csc == -1)
+            immutable status = cam_send_ccb(camDevice, cast(ccb*) ccbLike.ptr);
+            if (status == -1)
             {
                 import std.stdio : stderr, writeln;
 
-                immutable err = errno;
-                logError("cam_send_ccb failed, " ~ drive, err);
+                immutable errorNumber = errno;
+                logError("cam_send_ccb failed, " ~ drivePathName, errorNumber);
                 stderr.writeln(cast(string) cam_errbuf);
-                return IoctlResult(false, IoctlErrorStage.ioctl, err);
+                return IoctlResult(false, IoctlErrorStage.ioctl, errorNumber);
             }
 
-            logError("cam_send_ccb succeeded, " ~ drive, 0);
+            logError("cam_send_ccb succeeded, " ~ drivePathName, 0);
 
             return IoctlResult(true, IoctlErrorStage.none, 0);
         }
 
-        auto statusImpl(string drive)
+        auto statusImpl(string drivePathName)
         {
             auto mechanismStatusHeader = MechanismStatusHeader();
-            immutable r = camCommander(drive, mechanismStatusCDB, mechanismStatusHeader);
+            immutable ioctlResult = camCommander(drivePathName, mechanismStatusCDB, mechanismStatusHeader);
 
-            if (r.ok)
+            if (ioctlResult.ok)
             {
                 debug (VerboseEjector)
                 {
@@ -133,34 +133,34 @@ version (FreeBSD)
             }
         }
 
-        auto ejectableImpl(string drive)
+        auto ejectableImpl(string drivePathName)
         {
-            return ejectableClosableImpl!(OpenCloseMode.open)(drive);
+            return ejectableClosableImpl!(OpenCloseMode.open)(drivePathName);
         }
 
-        auto closableImpl(string drive)
+        auto closableImpl(string drivePathName)
         {
-            return ejectableClosableImpl!(OpenCloseMode.close)(drive);
+            return ejectableClosableImpl!(OpenCloseMode.close)(drivePathName);
         }
 
-        private auto getConfiguration(string drive, ref RemovableMediumFeatureResponse buf)
+        private auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
         {
-            return camCommander(drive, getConfigurationCDB, buf);
+            return camCommander(drivePathName, getConfigurationCDB, response);
         }
 
-        private auto ejectableClosableImpl(OpenCloseMode mode)(string drive)
+        private auto ejectableClosableImpl(OpenCloseMode mode)(string drivePathName)
         {
-            return ejectableClosableCommon!(getConfiguration, mode)(drive);
+            return ejectableClosableCommon!(getConfiguration, mode)(drivePathName);
         }
 
-        auto openImpl(string drive)
+        auto openImpl(string drivePathName)
         {
-            return ioctlWrapper(drive, Command.CDIOCEJECT).ok;
+            return ioctlWrapper(drivePathName, Command.CDIOCEJECT).ok;
         }
 
-        auto closeImpl(string drive)
+        auto closeImpl(string drivePathName)
         {
-            return ioctlWrapper(drive, Command.CDIOCCLOSE).ok;
+            return ioctlWrapper(drivePathName, Command.CDIOCCLOSE).ok;
         }
     }
 }

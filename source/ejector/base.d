@@ -6,14 +6,14 @@ Distributed under the Boost Software License, Version 1.0.
 
 module ejector.base;
 
-package void logGeneric(T...)(string msg, T additionalMsgs)
+package void logGeneric(T...)(string message, T additionalMessages)
 {
     debug (VerboseEjector)
     {
         import std.stdio : stderr, writeln;
 
-        stderr.writeln(msg);
-        foreach (m; additionalMsgs)
+        stderr.writeln(message);
+        foreach (m; additionalMessages)
         {
             stderr.writeln(" => ", m);
         }
