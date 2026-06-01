@@ -27,20 +27,20 @@ version (Ejector_Posix) private
 
     import std.typecons : Tuple;
 
-    alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNo");
+    alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNumber");
 
-    void logError(T...)(string msg, int errNo, T additionalMsgs)
+    void logError(T...)(string message, int errorNumber, T additionalMessages)
     {
         debug (VerboseEjector)
         {
             import core.stdc.string : strerror;
             import std.conv : text;
 
-            logGeneric(msg ~ ": " ~ errNo.strerror.text, additionalMsgs);
+            logGeneric(message ~ ": " ~ errorNumber.strerror.text, additionalMessages);
         }
     }
 
-    IoctlResult ioctlWrapper(Command, T)(string drive, Command cmd, ref int sta, T third)
+    IoctlResult ioctlWrapper(Command, T)(string drivePathName, Command command, ref int status, T third)
     {
         import core.stdc.errno : errno;
         import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, open;
@@ -48,39 +48,39 @@ version (Ejector_Posix) private
         import core.sys.posix.unistd : close;
         import std.string : toStringz;
 
-        immutable fd = open(drive.toStringz, O_NONBLOCK | O_RDONLY);
+        immutable fileDescriptor = open(drivePathName.toStringz, O_NONBLOCK | O_RDONLY);
         scope (exit)
-            fd != -1 && close(fd);
+            fileDescriptor != -1 && close(fileDescriptor);
 
-        if (fd == -1)
+        if (fileDescriptor == -1)
         {
-            immutable err = errno;
-            logError("open failed, " ~ drive, err);
-            return IoctlResult(false, IoctlErrorStage.open, err);
+            immutable errorNumber = errno;
+            logError("open failed, " ~ drivePathName, errorNumber);
+            return IoctlResult(false, IoctlErrorStage.open, errorNumber);
         }
 
-        sta = ioctl(fd, cmd, third);
-        if (sta == -1)
+        status = ioctl(fileDescriptor, command, third);
+        if (status == -1)
         {
-            immutable err = errno;
-            logError("ioctl failed, " ~ drive, err);
-            return IoctlResult(false, IoctlErrorStage.ioctl, err);
+            immutable errorNumber = errno;
+            logError("ioctl failed, " ~ drivePathName, errorNumber);
+            return IoctlResult(false, IoctlErrorStage.ioctl, errorNumber);
         }
 
-        logError("ioctl succeeded, " ~ drive, 0);
+        logError("ioctl succeeded, " ~ drivePathName, 0);
 
         return IoctlResult(true, IoctlErrorStage.none, 0);
     }
 
-    IoctlResult ioctlWrapper(Command)(string drive, Command cmd, ref int sta)
+    IoctlResult ioctlWrapper(Command)(string drivePathName, Command command, ref int status)
     {
-        return ioctlWrapper(drive, cmd, sta, 0);
+        return ioctlWrapper(drivePathName, command, status, 0);
     }
 
-    IoctlResult ioctlWrapper(Command)(string drive, Command cmd)
+    IoctlResult ioctlWrapper(Command)(string drivePathName, Command command)
     {
-        int sta;
-        return ioctlWrapper(drive, cmd, sta);
+        int status;
+        return ioctlWrapper(drivePathName, command, status);
     }
 
     static immutable GetConfigurationCDB getConfigurationCDB = {
@@ -89,32 +89,32 @@ version (Ejector_Posix) private
         allocationLength: [0, RemovableMediumFeatureResponse.sizeof],
     };
 
-    bool ejectableClosableCommon(alias sendGetConfiguration, OpenCloseMode mode)(string drive)
+    bool ejectableClosableCommon(alias getConfigurationFunction, OpenCloseMode mode)(string drivePathName)
     {
-        auto buf = RemovableMediumFeatureResponse();
-        immutable r = sendGetConfiguration(drive, buf);
+        auto response = RemovableMediumFeatureResponse();
+        immutable ioctlResult = getConfigurationFunction(drivePathName, response);
 
         debug (VerboseEjector)
         {
             import std.stdio : stderr, writeln;
 
-            if (r.ok)
+            if (ioctlResult.ok)
             {
-                stderr.writeln("get configuration succeeded, ", drive);
-                stderr.writeln(buf);
+                stderr.writeln("get configuration succeeded, ", drivePathName);
+                stderr.writeln(response);
             }
             else
             {
-                stderr.writeln("get configuration failed, ", drive);
+                stderr.writeln("get configuration failed, ", drivePathName);
             }
         }
 
-        if (!r.ok)
+        if (!ioctlResult.ok)
         {
             // We might have to execute MODE SENSE (10)
             return false;
         }
 
-        return parseEjectableClosable!mode(buf);
+        return parseEjectableClosable!mode(response);
     }
 }

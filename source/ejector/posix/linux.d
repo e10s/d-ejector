@@ -10,13 +10,13 @@ version (linux)
 {
     package mixin template LinuxImpl()
     {
-        auto statusImpl(string drive)
+        auto statusImpl(string drivePathName)
         {
-            int sta = -1;
-            immutable r = ioctlWrapper(drive, CDROM_DRIVE_STATUS, sta);
-            if (r.ok && sta != CDS_NO_INFO)
+            int status = -1;
+            immutable ioctlResult = ioctlWrapper(drivePathName, CDROM_DRIVE_STATUS, status);
+            if (ioctlResult.ok && status != CDS_NO_INFO)
             {
-                return sta == CDS_TRAY_OPEN ?
+                return status == CDS_TRAY_OPEN ?
                     TrayStatus.OPEN : TrayStatus.CLOSED;
             }
             else
@@ -25,46 +25,46 @@ version (linux)
             }
         }
 
-        auto ejectableImpl(string drive)
+        auto ejectableImpl(string drivePathName)
         {
-            return ejectableClosableImpl!(OpenCloseMode.open)(drive);
+            return ejectableClosableImpl!(OpenCloseMode.open)(drivePathName);
         }
 
-        auto closableImpl(string drive)
+        auto closableImpl(string drivePathName)
         {
-            return ejectableClosableImpl!(OpenCloseMode.close)(drive);
+            return ejectableClosableImpl!(OpenCloseMode.close)(drivePathName);
         }
 
-        private auto getConfiguration(string drive, ref RemovableMediumFeatureResponse buf)
+        private auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
         {
-            sg_io_hdr hdr = {
+            sg_io_hdr header = {
                 interface_id: SG_INTERFACE_ID_ORIG,
                 dxfer_direction: SG_DXFER_FROM_DEV,
                 cmd_len: GetConfigurationCDB.sizeof,
                 dxfer_len: RemovableMediumFeatureResponse.sizeof,
-                dxferp: &buf,
+                dxferp: &response,
                 cmdp: cast(ubyte*)&getConfigurationCDB,
                 sbp: null,
                 timeout: 5000
             };
 
-            int sta;
-            return ioctlWrapper(drive, SG_IO, sta, &hdr);
+            int status;
+            return ioctlWrapper(drivePathName, SG_IO, status, &header);
         }
 
-        private auto ejectableClosableImpl(OpenCloseMode mode)(string drive)
+        private auto ejectableClosableImpl(OpenCloseMode mode)(string drivePathName)
         {
-            return ejectableClosableCommon!(getConfiguration, mode)(drive);
+            return ejectableClosableCommon!(getConfiguration, mode)(drivePathName);
         }
 
-        auto openImpl(string drive)
+        auto openImpl(string drivePathName)
         {
-            return ioctlWrapper(drive, CDROMEJECT).ok;
+            return ioctlWrapper(drivePathName, CDROMEJECT).ok;
         }
 
-        auto closeImpl(string drive)
+        auto closeImpl(string drivePathName)
         {
-            return ioctlWrapper(drive, CDROMCLOSETRAY).ok;
+            return ioctlWrapper(drivePathName, CDROMCLOSETRAY).ok;
         }
     }
 }
