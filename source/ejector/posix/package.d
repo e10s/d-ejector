@@ -29,15 +29,14 @@ version (Ejector_Posix) private
 
     alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNo");
 
-    void logError(string msg, int errNo)
+    void logError(T...)(string msg, int errNo, T additionalMsgs)
     {
         debug (VerboseEjector)
         {
             import core.stdc.string : strerror;
             import std.conv : text;
-            import std.stdio : stderr, writeln;
 
-            stderr.writeln(msg, ": ", errNo.strerror.text);
+            logGeneric(msg ~ ": " ~ errNo.strerror.text, additionalMsgs);
         }
     }
 

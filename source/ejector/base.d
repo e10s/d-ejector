@@ -6,6 +6,20 @@ Distributed under the Boost Software License, Version 1.0.
 
 module ejector.base;
 
+package void logGeneric(T...)(string msg, T additionalMsgs)
+{
+    debug (VerboseEjector)
+    {
+        import std.stdio : stderr, writeln;
+
+        stderr.writeln(msg);
+        foreach (m; additionalMsgs)
+        {
+            stderr.writeln(" => ", m);
+        }
+    }
+}
+
 enum TrayStatus
 {
     ERROR,

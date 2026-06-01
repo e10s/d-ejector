@@ -71,14 +71,13 @@ version (FreeBSD)
 
             cam_errbuf[] = 0;
             auto cam_dev = cam_open_device(drive.toStringz, O_RDWR);
+            scope (exit)
+                cam_dev && cam_close_device(cam_dev);
+
             if (!cam_dev)
             {
-                import std.stdio : stderr, writeln;
-
-                immutable err = errno;
-
-                stderr.writeln(cast(string) cam_errbuf);
-                return IoctlResult(false, IoctlErrorStage.open, err);
+                logGeneric("cam_open_device failed, " ~ drive, cast(string) cam_errbuf);
+                return IoctlResult(false, IoctlErrorStage.open, 0);
             }
 
             ubyte[CCB_SIZE] ccbLike; // substitute for union ccb
@@ -97,13 +96,12 @@ version (FreeBSD)
                 import std.stdio : stderr, writeln;
 
                 immutable err = errno;
-
+                logError("cam_send_ccb failed, " ~ drive, err);
                 stderr.writeln(cast(string) cam_errbuf);
-                cam_close_device(cam_dev);
                 return IoctlResult(false, IoctlErrorStage.ioctl, err);
             }
 
-            cam_close_device(cam_dev);
+            logError("cam_send_ccb succeeded, " ~ drive, 0);
 
             return IoctlResult(true, IoctlErrorStage.none, 0);
         }
