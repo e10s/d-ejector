@@ -96,6 +96,22 @@ version (Windows) private
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
             METHOD_BUFFERED, FILE_READ_ACCESS);
 
+    void logError(T...)(string msg, uint errNo, T additionalMsgs)
+    {
+        debug (VerboseEjector)
+        {
+            import std.conv : text;
+            import std.string : chomp;
+
+            char[512] buf;
+            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, null, errNo,
+                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                buf.ptr, buf.length, null);
+
+            logGeneric(msg ~ ": " ~ buf.ptr.text.chomp, additionalMsgs);
+        }
+    }
+
     // Select the first optical drive in alphabetical order.
     @property auto defaultDrive()
     {
@@ -205,21 +221,6 @@ version (Windows) private
 
 version (Windows) package
 {
-    void logError(string msg, uint errNo)
-    {
-        debug (VerboseEjector)
-        {
-            import std.conv : text;
-            import std.stdio : stderr, writeln;
-
-            char[512] buf;
-            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, null, errNo,
-                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                buf.ptr, buf.length, null);
-            stderr.writeln(msg, ": ", buf.ptr.text);
-        }
-    }
-
     auto statusImpl(string driveLetter)
     {
         import ejector.base;
