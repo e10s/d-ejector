@@ -96,19 +96,19 @@ version (Windows) private
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
             METHOD_BUFFERED, FILE_READ_ACCESS);
 
-    void logError(T...)(string msg, uint errNo, T additionalMsgs)
+    void logError(T...)(string message, uint errorNumber, T additionalMessages)
     {
         debug (VerboseEjector)
         {
             import std.conv : text;
             import std.string : chomp;
 
-            char[512] buf;
-            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, null, errNo,
+            char[512] buffer;
+            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, null, errorNumber,
                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                buf.ptr, buf.length, null);
+                buffer.ptr, buffer.length, null);
 
-            logGeneric(msg ~ ": " ~ buf.ptr.text.chomp, additionalMsgs);
+            logGeneric(message ~ ": " ~ buffer.ptr.text.chomp, additionalMessages);
         }
     }
 
@@ -120,9 +120,9 @@ version (Windows) private
         import std.utf : toUTF16z;
         import core.sys.windows.winbase : DRIVE_CDROM, GetDriveType;
 
-        auto drives = uppercase.map!(a => (cast(char) a))
+        auto driveLetters = uppercase.map!(a => (cast(char) a))
             .find!(a => GetDriveType(toUTF16z(a ~ `:\`)) == DRIVE_CDROM);
-        if (drives.empty)
+        if (driveLetters.empty)
         {
             return "";
         }
@@ -130,7 +130,7 @@ version (Windows) private
         {
             import std.conv : text;
 
-            return drives.front.text;
+            return driveLetters.front.text;
         }
     }
 
@@ -141,29 +141,29 @@ version (Windows) private
         immutable drivePath = `\\.\` ~
             (driveLetter == "" ? defaultDrive : driveLetter) ~ ":";
 
-        auto h = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
+        auto handle = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
 
-        immutable err = GetLastError;
+        immutable errorNumber = GetLastError;
         logError(`CreateFile("` ~ drivePath ~ `") ` ~
-                (err == 0 ? "succeeded" : "failed"), err);
+                (errorNumber == 0 ? "succeeded" : "failed"), errorNumber);
 
-        return h;
+        return handle;
     }
 
     auto ejectableClosableImpl(OpenCloseMode mode)(string driveLetter)
     {
-        auto h = createDriveHandle(driveLetter);
+        auto handle = createDriveHandle(driveLetter);
         scope (exit)
-            h != INVALID_HANDLE_VALUE && CloseHandle(h);
+            handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
 
-        if (h == INVALID_HANDLE_VALUE)
+        if (handle == INVALID_HANDLE_VALUE)
         {
             return false;
         }
 
-        enum gciiSize = DWORD(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
-        GET_CONFIGURATION_IOCTL_INPUT gcii = {
+        enum ioctlInputSize = DWORD(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
+        GET_CONFIGURATION_IOCTL_INPUT ioctlInput = {
             Feature: FEATURE_NUMBER.FeatureRemovableMedium,
             RequestType: SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
         };
@@ -172,16 +172,16 @@ version (Windows) private
         enum responseSize = DWORD(RemovableMediumFeatureResponse.sizeof);
         auto response = RemovableMediumFeatureResponse();
 
-        DWORD ret;
-        immutable dic = DeviceIoControl(h, IOCTL_CDROM_GET_CONFIGURATION,
-            &gcii, gciiSize, &response, responseSize, &ret, null);
-        immutable err = GetLastError;
+        DWORD bytesReturned;
+        immutable status = DeviceIoControl(handle, IOCTL_CDROM_GET_CONFIGURATION,
+            &ioctlInput, ioctlInputSize, &response, responseSize, &bytesReturned, null);
+        immutable errorNumber = GetLastError;
         logError("DeviceIoControl() " ~
-                (err == 0 ? "succeeded" : "failed"), err);
+                (errorNumber == 0 ? "succeeded" : "failed"), errorNumber);
 
-        if (!dic)
+        if (!status)
         {
-            // If dic fails, we might have to execute MODE SENSE (10)
+            // If DeviceIoControl fails, we might have to execute MODE SENSE (10)
             return false;
         }
 
@@ -197,25 +197,25 @@ version (Windows) private
 
     auto openCloseImpl(OpenCloseMode mode)(string driveLetter)
     {
-        auto h = createDriveHandle(driveLetter);
+        auto handle = createDriveHandle(driveLetter);
         scope (exit)
-            h != INVALID_HANDLE_VALUE && CloseHandle(h);
+            handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
 
-        if (h == INVALID_HANDLE_VALUE)
+        if (handle == INVALID_HANDLE_VALUE)
         {
             return false;
         }
 
-        DWORD ret;
-        enum cmd = mode == OpenCloseMode.open ?
+        DWORD bytesReturned;
+        enum command = mode == OpenCloseMode.open ?
     IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
-        immutable dic = DeviceIoControl(h, cmd, null, 0, null, 0, &ret, null);
-        immutable err = GetLastError;
+        immutable status = DeviceIoControl(handle, command, null, 0, null, 0, &bytesReturned, null);
+        immutable errorNumber = GetLastError;
 
         logError("DeviceIoControl() " ~
-                (err == 0 ? "succeeded" : "failed"), err);
+                (errorNumber == 0 ? "succeeded" : "failed"), errorNumber);
 
-        return !!dic;
+        return !!status;
     }
 }
 
@@ -223,22 +223,20 @@ version (Windows) package
 {
     auto statusImpl(string driveLetter)
     {
-        import ejector.base;
-
-        auto h = createDriveHandle(driveLetter);
+        auto handle = createDriveHandle(driveLetter);
         scope (exit)
-            h != INVALID_HANDLE_VALUE && CloseHandle(h);
+            handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
 
-        if (h == INVALID_HANDLE_VALUE)
+        if (handle == INVALID_HANDLE_VALUE)
         {
             return TrayStatus.ERROR;
         }
 
-        enum sptdSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
+        enum ioctlIOSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
 
         auto mechanismStatusHeader = MechanismStatusHeader();
-        SCSI_PASS_THROUGH_DIRECT sptd = {
-            Length: sptdSize, // PathId, TargetId and Lun are "don't-care" params:
+        SCSI_PASS_THROUGH_DIRECT ioctlIO = {
+            Length: ioctlIOSize, // PathId, TargetId and Lun are "don't-care" params:
                 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
             CdbLength: MechanismStatusCDB.sizeof,
             DataIn: SCSI_IOCTL_DATA_IN,
@@ -249,15 +247,15 @@ version (Windows) package
 
         import core.lifetime : emplace;
 
-        emplace!MechanismStatusCDB(sptd.Cdb[], mechanismStatusCDB);
+        emplace!MechanismStatusCDB(ioctlIO.Cdb[], mechanismStatusCDB);
 
-        DWORD ret;
-        immutable dic = DeviceIoControl(h, IOCTL_SCSI_PASS_THROUGH_DIRECT,
-            &sptd, sptdSize, &sptd, sptdSize, &ret, null);
+        DWORD bytesReturned;
+        immutable status = DeviceIoControl(handle, IOCTL_SCSI_PASS_THROUGH_DIRECT,
+            &ioctlIO, ioctlIOSize, &ioctlIO, ioctlIOSize, &bytesReturned, null);
 
-        immutable err = GetLastError;
+        immutable errorNumber = GetLastError;
         logError("DeviceIoControl() " ~
-                (err == 0 ? "succeeded" : "failed"), err);
+                (errorNumber == 0 ? "succeeded" : "failed"), errorNumber);
 
         debug (VerboseEjector)
         {
@@ -266,7 +264,7 @@ version (Windows) package
             stderr.writeln(mechanismStatusHeader);
         }
 
-        if (!dic || sptd.ScsiStatus != 0)
+        if (!status || ioctlIO.ScsiStatus != 0)
         {
             return TrayStatus.ERROR;
         }
