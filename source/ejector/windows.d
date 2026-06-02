@@ -189,40 +189,20 @@ version (Windows) private
         return handle;
     }
 
-    auto ejectableClosableImpl(OpenCloseMode mode)(string driveLetter)
+    auto getConfiguration(string driveLetter, ref RemovableMediumFeatureResponse response)
     {
         GET_CONFIGURATION_IOCTL_INPUT ioctlInput = {
             Feature: FEATURE_NUMBER.FeatureRemovableMedium,
             RequestType: SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
         };
 
-        // Same as GET_CONFIGURATION_HEADER + FEATURE_DATA_REMOVABLE_MEDIUM
-        auto response = RemovableMediumFeatureResponse();
         int status;
-        auto ioctlResult = ioctlWrapper(driveLetter, IOCTL_CDROM_GET_CONFIGURATION, &ioctlInput, &response, status);
+        return ioctlWrapper(driveLetter, IOCTL_CDROM_GET_CONFIGURATION, &ioctlInput, &response, status);
+    }
 
-        debug (VerboseEjector)
-        {
-            import std.stdio : stderr, writeln;
-
-            if (ioctlResult.ok)
-            {
-                stderr.writeln("get configuration succeeded, ", driveLetter);
-                stderr.writeln(response);
-            }
-            else
-            {
-                stderr.writeln("get configuration failed, ", driveLetter);
-            }
-        }
-
-        if (!ioctlResult.ok)
-        {
-            // We might have to execute MODE SENSE (10)
-            return false;
-        }
-
-        return parseEjectableClosable!mode(response);
+    auto ejectableClosableImpl(OpenCloseMode mode)(string driveLetter)
+    {
+        return ejectableClosableCommon!(getConfiguration, mode)(driveLetter);
     }
 
     auto openCloseImpl(OpenCloseMode mode)(string driveLetter)

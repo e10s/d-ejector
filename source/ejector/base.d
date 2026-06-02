@@ -137,7 +137,36 @@ static assert(MechanismStatusHeader.sizeof == 8);
 
 // Goodies
 
-package bool parseEjectableClosable(OpenCloseMode mode)(RemovableMediumFeatureResponse response)
+package bool ejectableClosableCommon(alias getConfigurationFunction, OpenCloseMode mode)(string driveName)
+{
+    auto response = RemovableMediumFeatureResponse();
+    immutable ioctlResult = getConfigurationFunction(driveName, response);
+
+    debug (VerboseEjector)
+    {
+        import std.stdio : stderr, writeln;
+
+        if (ioctlResult.ok)
+        {
+            stderr.writeln("get configuration succeeded, ", driveName);
+            stderr.writeln(response);
+        }
+        else
+        {
+            stderr.writeln("get configuration failed, ", driveName);
+        }
+    }
+
+    if (!ioctlResult.ok)
+    {
+        // We might have to execute MODE SENSE (10)
+        return false;
+    }
+
+    return parseEjectableClosable!mode(response);
+}
+
+private bool parseEjectableClosable(OpenCloseMode mode)(RemovableMediumFeatureResponse response)
 {
 
     // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638

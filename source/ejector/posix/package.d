@@ -78,32 +78,5 @@ version (Ejector_Posix) private
         allocationLength: [0, RemovableMediumFeatureResponse.sizeof],
     };
 
-    bool ejectableClosableCommon(alias getConfigurationFunction, OpenCloseMode mode)(string drivePathName)
-    {
-        auto response = RemovableMediumFeatureResponse();
-        immutable ioctlResult = getConfigurationFunction(drivePathName, response);
 
-        debug (VerboseEjector)
-        {
-            import std.stdio : stderr, writeln;
-
-            if (ioctlResult.ok)
-            {
-                stderr.writeln("get configuration succeeded, ", drivePathName);
-                stderr.writeln(response);
-            }
-            else
-            {
-                stderr.writeln("get configuration failed, ", drivePathName);
-            }
-        }
-
-        if (!ioctlResult.ok)
-        {
-            // We might have to execute MODE SENSE (10)
-            return false;
-        }
-
-        return parseEjectableClosable!mode(response);
-    }
 }
