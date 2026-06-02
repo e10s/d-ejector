@@ -7,3 +7,21 @@ charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
 
+# https://zenn.dev/nonanonno/scraps/8f400771dbe2e8
+[*.d]
+max_line_length = 120
+dfmt_brace_style = allman
+dfmt_soft_max_line_length = 80
+dfmt_align_switch_statements = unset
+dfmt_outdent_attributes = unset
+dfmt_split_operator_at_line_end = unset
+dfmt_space_after_cast = true
+dfmt_space_after_keywords = unset
+dfmt_space_before_function_parameters = unset
+dfmt_selective_import_space = true
+dfmt_compact_labeled_statements = unset
+dfmt_template_constraint_style = always_newline
+dfmt_single_template_constraint_indent = unset
+dfmt_space_before_aa_colon = unset
+dfmt_keep_line_breaks = unset
+dfmt_single_indent = unset
