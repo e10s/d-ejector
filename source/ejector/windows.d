@@ -113,7 +113,7 @@ version (Windows) private
     }
 
     IoctlResult ioctlWrapper(Command, IoctlInput = void, IoctlOutput = void)(string driveLetter, Command command,
-        IoctlInput* ioctlInputPointer, IoctlOutput* ioctlOutputPointer, ref int status)
+        IoctlInput* ioctlInputPointer, IoctlOutput* ioctlOutputPointer)
     {
         auto handle = createDriveHandle(driveLetter);
         scope (exit)
@@ -136,7 +136,7 @@ version (Windows) private
         {
             ioctlOutputSize = IoctlOutput.sizeof;
         }
-        status = DeviceIoControl(handle, command,
+        immutable status = DeviceIoControl(handle, command,
             ioctlInputPointer, ioctlInputSize, ioctlOutputPointer, ioctlOutputSize, null, null);
         if (!status)
         {
@@ -148,6 +148,11 @@ version (Windows) private
         logError("ioctl succeeded, " ~ driveLetter, 0);
 
         return IoctlResult(true, IoctlErrorStage.none, 0);
+    }
+
+    IoctlResult ioctlWrapper(Command)(string driveLetter, Command command)
+    {
+        return ioctlWrapper(driveLetter, command, null, null);
     }
 
     // Select the first optical drive in alphabetical order.
@@ -192,17 +197,7 @@ version (Windows) private
             RequestType: SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
         };
 
-        int status;
-        return ioctlWrapper(driveLetter, IOCTL_CDROM_GET_CONFIGURATION, &ioctlInput, &response, status);
-    }
-
-    auto openCloseImpl(OpenCloseMode mode)(string driveLetter)
-    {
-        enum command = mode == OpenCloseMode.open ? IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
-        int status;
-        auto ioctlResult = ioctlWrapper(driveLetter, command, null, null, status);
-
-        return ioctlResult.ok;
+        return ioctlWrapper(driveLetter, IOCTL_CDROM_GET_CONFIGURATION, &ioctlInput, &response);
     }
 }
 
@@ -227,9 +222,7 @@ version (Windows) package
 
         emplace!MechanismStatusCDB(ioctlIO.Cdb[], mechanismStatusCDB);
 
-        int status;
-        immutable ioctlResult = ioctlWrapper(driveLetter, IOCTL_SCSI_PASS_THROUGH_DIRECT,
-            &ioctlIO, &ioctlIO, status);
+        immutable ioctlResult = ioctlWrapper(driveLetter, IOCTL_SCSI_PASS_THROUGH_DIRECT, &ioctlIO, &ioctlIO);
 
         debug (VerboseEjector)
         {
@@ -272,11 +265,11 @@ version (Windows) package
 
     auto openImpl(string driveLetter)
     {
-        return openCloseImpl!(OpenCloseMode.open)(driveLetter);
+        return ioctlWrapper(driveLetter, IOCTL_STORAGE_EJECT_MEDIA).ok;
     }
 
     auto closeImpl(string driveLetter)
     {
-        return openCloseImpl!(OpenCloseMode.close)(driveLetter);
+        return ioctlWrapper(driveLetter, IOCTL_STORAGE_LOAD_MEDIA).ok;
     }
 }
