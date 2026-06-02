@@ -181,11 +181,7 @@ version (Windows) private
 
         auto handle = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
-        /*
-        immutable errorNumber = GetLastError;
-        logError(`CreateFile("` ~ drivePath ~ `") ` ~
-                (errorNumber == 0 ? "succeeded" : "failed"), errorNumber);
-*/
+
         return handle;
     }
 
