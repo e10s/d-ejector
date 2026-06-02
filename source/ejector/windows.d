@@ -207,15 +207,6 @@ version (Windows) private
 
     auto openCloseImpl(OpenCloseMode mode)(string driveLetter)
     {
-        auto handle = createDriveHandle(driveLetter);
-        scope (exit)
-            handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
-
-        if (handle == INVALID_HANDLE_VALUE)
-        {
-            return false;
-        }
-
         enum command = mode == OpenCloseMode.open ? IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
         int status;
         auto ioctlResult = ioctlWrapper(driveLetter, command, null, null, status);
