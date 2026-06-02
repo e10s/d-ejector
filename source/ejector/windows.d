@@ -96,7 +96,7 @@ version (Windows) private
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
             METHOD_BUFFERED, FILE_READ_ACCESS);
 
-    void logError(T...)(string message, uint errorNumber, T additionalMessages)
+    void logError(T...)(lazy string message, uint errorNumber, lazy T additionalMessages)
     {
         debug (VerboseEjector)
         {

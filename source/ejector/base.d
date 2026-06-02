@@ -17,7 +17,7 @@ import std.typecons : Tuple;
 
 package alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNumber");
 
-package void logGeneric(T...)(string message, T additionalMessages)
+package void logGeneric(T...)(lazy string message, lazy T additionalMessages)
 {
     debug (VerboseEjector)
     {

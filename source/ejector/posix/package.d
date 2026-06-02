@@ -18,7 +18,7 @@ version (FreeBSD)
 
 version (Ejector_Posix) private
 {
-    void logError(T...)(string message, int errorNumber, T additionalMessages)
+    void logError(T...)(lazy string message, int errorNumber, lazy T additionalMessages)
     {
         debug (VerboseEjector)
         {
