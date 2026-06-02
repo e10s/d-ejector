@@ -18,17 +18,6 @@ version (FreeBSD)
 
 version (Ejector_Posix) private
 {
-    enum IoctlErrorStage
-    {
-        none,
-        open,
-        ioctl
-    }
-
-    import std.typecons : Tuple;
-
-    alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNumber");
-
     void logError(T...)(string message, int errorNumber, T additionalMessages)
     {
         debug (VerboseEjector)

@@ -112,6 +112,47 @@ version (Windows) private
         }
     }
 
+    IoctlResult ioctlWrapper(Command, IoctlInput, IoctlOutput)(string driveLetter, Command command,
+        auto ref IoctlInput ioctlInput, auto ref IoctlOutput ioctlOutput, ref int status)
+    {
+        immutable handle = createDriveHandle(driveLetter);
+        scope (exit)
+            handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
+
+        if (handle == INVALID_HANDLE_VALUE)
+        {
+            immutable errorNumber = GetLastError;
+            logError("open failed, " ~ driveLetter, errorNumber);
+            return IoctlResult(false, IoctlErrorStage.open, errorNumber);
+        }
+        IoctlInput* ioctlInputPointer;
+        IoctlOutput* ioctlOutputPointer;
+        DWORD ioctlInputSize;
+        DWORD ioctlOutputSize;
+        if (ioctlInput !is null)
+        {
+            ioctlInputPointer = &ioctlInput;
+            ioctlInputSize = IoctlInput.sizeof;
+        }
+        if (ioctlOutput !is null)
+        {
+            ioctlOutputPointer = &ioctlOutput;
+            ioctlOutputSize = IoctlOutput.sizeof;
+        }
+        status = DeviceIoControl(handle, command,
+            ioctlInputPointer, ioctlInputSize, ioctlOutputPointer, ioctlOutputSize, null, null);
+        if (!status)
+        {
+            immutable errorNumber = GetLastError;
+            logError("ioctl failed, " ~ driveLetter, errorNumber);
+            return IoctlResult(false, IoctlErrorStage.ioctl, errorNumber);
+        }
+
+        logError("ioctl succeeded, " ~ driveLetter, 0);
+
+        return IoctlResult(true, IoctlErrorStage.none, 0);
+    }
+
     // Select the first optical drive in alphabetical order.
     @property auto defaultDrive()
     {
@@ -143,11 +184,11 @@ version (Windows) private
 
         auto handle = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
-
+        /*
         immutable errorNumber = GetLastError;
         logError(`CreateFile("` ~ drivePath ~ `") ` ~
                 (errorNumber == 0 ? "succeeded" : "failed"), errorNumber);
-
+*/
         return handle;
     }
 

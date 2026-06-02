@@ -6,6 +6,17 @@ Distributed under the Boost Software License, Version 1.0.
 
 module ejector.base;
 
+package enum IoctlErrorStage
+{
+    none,
+    open,
+    ioctl
+}
+
+import std.typecons : Tuple;
+
+package alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNumber");
+
 package void logGeneric(T...)(string message, T additionalMessages)
 {
     debug (VerboseEjector)
