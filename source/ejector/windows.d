@@ -112,10 +112,10 @@ version (Windows) private
         }
     }
 
-    IoctlResult ioctlWrapper(Command, IoctlInput, IoctlOutput)(string driveLetter, Command command,
-        auto ref IoctlInput ioctlInput, auto ref IoctlOutput ioctlOutput, ref int status)
+    IoctlResult ioctlWrapper(Command, IoctlInput = void, IoctlOutput = void)(string driveLetter, Command command,
+        IoctlInput* ioctlInputPointer, IoctlOutput* ioctlOutputPointer, ref int status)
     {
-        immutable handle = createDriveHandle(driveLetter);
+        auto handle = createDriveHandle(driveLetter);
         scope (exit)
             handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
 
@@ -125,18 +125,15 @@ version (Windows) private
             logError("open failed, " ~ driveLetter, errorNumber);
             return IoctlResult(false, IoctlErrorStage.open, errorNumber);
         }
-        IoctlInput* ioctlInputPointer;
-        IoctlOutput* ioctlOutputPointer;
+
         DWORD ioctlInputSize;
         DWORD ioctlOutputSize;
-        if (ioctlInput !is null)
+        if (ioctlInputPointer !is null)
         {
-            ioctlInputPointer = &ioctlInput;
             ioctlInputSize = IoctlInput.sizeof;
         }
-        if (ioctlOutput !is null)
+        if (ioctlOutputPointer !is null)
         {
-            ioctlOutputPointer = &ioctlOutput;
             ioctlOutputSize = IoctlOutput.sizeof;
         }
         status = DeviceIoControl(handle, command,
@@ -194,43 +191,35 @@ version (Windows) private
 
     auto ejectableClosableImpl(OpenCloseMode mode)(string driveLetter)
     {
-        auto handle = createDriveHandle(driveLetter);
-        scope (exit)
-            handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
-
-        if (handle == INVALID_HANDLE_VALUE)
-        {
-            return false;
-        }
-
-        enum ioctlInputSize = DWORD(GET_CONFIGURATION_IOCTL_INPUT.sizeof);
         GET_CONFIGURATION_IOCTL_INPUT ioctlInput = {
             Feature: FEATURE_NUMBER.FeatureRemovableMedium,
             RequestType: SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
         };
 
         // Same as GET_CONFIGURATION_HEADER + FEATURE_DATA_REMOVABLE_MEDIUM
-        enum responseSize = DWORD(RemovableMediumFeatureResponse.sizeof);
         auto response = RemovableMediumFeatureResponse();
-
-        DWORD bytesReturned;
-        immutable status = DeviceIoControl(handle, IOCTL_CDROM_GET_CONFIGURATION,
-            &ioctlInput, ioctlInputSize, &response, responseSize, &bytesReturned, null);
-        immutable errorNumber = GetLastError;
-        logError("DeviceIoControl() " ~
-                (errorNumber == 0 ? "succeeded" : "failed"), errorNumber);
-
-        if (!status)
-        {
-            // If DeviceIoControl fails, we might have to execute MODE SENSE (10)
-            return false;
-        }
+        int status;
+        auto ioctlResult = ioctlWrapper(driveLetter, IOCTL_CDROM_GET_CONFIGURATION, &ioctlInput, &response, status);
 
         debug (VerboseEjector)
         {
             import std.stdio : stderr, writeln;
 
-            stderr.writeln(response);
+            if (ioctlResult.ok)
+            {
+                stderr.writeln("get configuration succeeded, ", driveLetter);
+                stderr.writeln(response);
+            }
+            else
+            {
+                stderr.writeln("get configuration failed, ", driveLetter);
+            }
+        }
+
+        if (!ioctlResult.ok)
+        {
+            // We might have to execute MODE SENSE (10)
+            return false;
         }
 
         return parseEjectableClosable!mode(response);
@@ -247,16 +236,11 @@ version (Windows) private
             return false;
         }
 
-        DWORD bytesReturned;
-        enum command = mode == OpenCloseMode.open ?
-    IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
-        immutable status = DeviceIoControl(handle, command, null, 0, null, 0, &bytesReturned, null);
-        immutable errorNumber = GetLastError;
+        enum command = mode == OpenCloseMode.open ? IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
+        int status;
+        auto ioctlResult = ioctlWrapper(driveLetter, command, null, null, status);
 
-        logError("DeviceIoControl() " ~
-                (errorNumber == 0 ? "succeeded" : "failed"), errorNumber);
-
-        return !!status;
+        return ioctlResult.ok;
     }
 }
 
@@ -264,15 +248,6 @@ version (Windows) package
 {
     auto statusImpl(string driveLetter)
     {
-        auto handle = createDriveHandle(driveLetter);
-        scope (exit)
-            handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
-
-        if (handle == INVALID_HANDLE_VALUE)
-        {
-            return TrayStatus.ERROR;
-        }
-
         enum ioctlIOSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
 
         auto mechanismStatusHeader = MechanismStatusHeader();
@@ -290,13 +265,9 @@ version (Windows) package
 
         emplace!MechanismStatusCDB(ioctlIO.Cdb[], mechanismStatusCDB);
 
-        DWORD bytesReturned;
-        immutable status = DeviceIoControl(handle, IOCTL_SCSI_PASS_THROUGH_DIRECT,
-            &ioctlIO, ioctlIOSize, &ioctlIO, ioctlIOSize, &bytesReturned, null);
-
-        immutable errorNumber = GetLastError;
-        logError("DeviceIoControl() " ~
-                (errorNumber == 0 ? "succeeded" : "failed"), errorNumber);
+        int status;
+        immutable ioctlResult = ioctlWrapper(driveLetter, IOCTL_SCSI_PASS_THROUGH_DIRECT,
+            &ioctlIO, &ioctlIO, status);
 
         debug (VerboseEjector)
         {
@@ -305,13 +276,25 @@ version (Windows) package
             stderr.writeln(mechanismStatusHeader);
         }
 
-        if (!status || ioctlIO.ScsiStatus != 0)
+        if (ioctlResult.ok && ioctlIO.ScsiStatus == 0)
         {
-            return TrayStatus.ERROR;
+            debug (VerboseEjector)
+            {
+                import std.stdio : stderr, writeln;
+
+                stderr.writeln("status succeeded");
+            }
+            return parseStatus(mechanismStatusHeader);
         }
         else
         {
-            return parseStatus(mechanismStatusHeader);
+            debug (VerboseEjector)
+            {
+                import std.stdio : stderr, writeln;
+
+                stderr.writeln("status failed");
+            }
+            return TrayStatus.ERROR;
         }
     }
 
