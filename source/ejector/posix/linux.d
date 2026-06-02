@@ -27,12 +27,12 @@ version (linux)
 
         auto ejectableImpl(string drivePathName)
         {
-            return ejectableClosableImpl!(OpenCloseMode.open)(drivePathName);
+            return ejectableClosableCommon!(getConfiguration, OpenCloseMode.open)(drivePathName);
         }
 
         auto closableImpl(string drivePathName)
         {
-            return ejectableClosableImpl!(OpenCloseMode.close)(drivePathName);
+            return ejectableClosableCommon!(getConfiguration, OpenCloseMode.close)(drivePathName);
         }
 
         private auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
@@ -50,11 +50,6 @@ version (linux)
 
             int status;
             return ioctlWrapper(drivePathName, SG_IO, status, &header);
-        }
-
-        private auto ejectableClosableImpl(OpenCloseMode mode)(string drivePathName)
-        {
-            return ejectableClosableCommon!(getConfiguration, mode)(drivePathName);
         }
 
         auto openImpl(string drivePathName)

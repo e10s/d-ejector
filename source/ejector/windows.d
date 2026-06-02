@@ -200,11 +200,6 @@ version (Windows) private
         return ioctlWrapper(driveLetter, IOCTL_CDROM_GET_CONFIGURATION, &ioctlInput, &response, status);
     }
 
-    auto ejectableClosableImpl(OpenCloseMode mode)(string driveLetter)
-    {
-        return ejectableClosableCommon!(getConfiguration, mode)(driveLetter);
-    }
-
     auto openCloseImpl(OpenCloseMode mode)(string driveLetter)
     {
         enum command = mode == OpenCloseMode.open ? IOCTL_STORAGE_EJECT_MEDIA : IOCTL_STORAGE_LOAD_MEDIA;
@@ -271,12 +266,12 @@ version (Windows) package
 
     auto ejectableImpl(string driveLetter)
     {
-        return ejectableClosableImpl!(OpenCloseMode.open)(driveLetter);
+        return ejectableClosableCommon!(getConfiguration, OpenCloseMode.open)(driveLetter);
     }
 
     auto closableImpl(string driveLetter)
     {
-        return ejectableClosableImpl!(OpenCloseMode.close)(driveLetter);
+        return ejectableClosableCommon!(getConfiguration, OpenCloseMode.close)(driveLetter);
     }
 
     auto openImpl(string driveLetter)
