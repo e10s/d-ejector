@@ -96,7 +96,7 @@ version (Windows) private
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
             METHOD_BUFFERED, FILE_READ_ACCESS);
 
-    void logError(T...)(lazy string message, uint errorNumber, lazy T additionalMessages)
+    void logError(T...)(lazy string message, uint errorNumber, lazy T additionalMessages, string caller = __FUNCTION__)
     {
         debug (VerboseEjector)
         {
@@ -108,7 +108,7 @@ version (Windows) private
                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
                 buffer.ptr, buffer.length, null);
 
-            logGeneric(message ~ ": " ~ buffer.ptr.text.chomp, additionalMessages);
+            logGeneric!T(message ~ ": " ~ buffer.ptr.text.chomp, additionalMessages, caller);
         }
     }
 

@@ -17,16 +17,17 @@ import std.typecons : Tuple;
 
 package alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNumber");
 
-package void logGeneric(T...)(lazy string message, lazy T additionalMessages)
+package void logGeneric(T...)(lazy string message, lazy T additionalMessages, string caller = __FUNCTION__)
 {
     debug (VerboseEjector)
     {
         import std.stdio : stderr, writeln;
 
-        stderr.writeln(message);
+        stderr.writeln("<" ~ caller ~ ">");
+        stderr.writeln("=> ", message);
         foreach (m; additionalMessages)
         {
-            stderr.writeln(" => ", m);
+            stderr.writeln("  => ", m);
         }
     }
 }

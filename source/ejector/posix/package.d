@@ -18,14 +18,14 @@ version (FreeBSD)
 
 version (Ejector_Posix) private
 {
-    void logError(T...)(lazy string message, int errorNumber, lazy T additionalMessages)
+    void logError(T...)(lazy string message, int errorNumber, lazy T additionalMessages, string caller = __FUNCTION__)
     {
         debug (VerboseEjector)
         {
             import core.stdc.string : strerror;
             import std.conv : text;
 
-            logGeneric(message ~ ": " ~ errorNumber.strerror.text, additionalMessages);
+            logGeneric!T(message ~ ": " ~ errorNumber.strerror.text, additionalMessages, caller);
         }
     }
 
@@ -77,6 +77,5 @@ version (Ejector_Posix) private
         startingFeatureNumber: [0, 0x03],
         allocationLength: [0, RemovableMediumFeatureResponse.sizeof],
     };
-
 
 }
