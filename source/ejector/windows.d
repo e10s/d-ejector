@@ -255,12 +255,12 @@ version (Windows) package
 
     auto ejectableImpl(string driveLetter)
     {
-        return ejectableClosableCommon!(getConfiguration, OpenCloseMode.open)(driveLetter);
+        return ejectableClosableCommon!getConfiguration(driveLetter, OpenCloseMode.open);
     }
 
     auto closableImpl(string driveLetter)
     {
-        return ejectableClosableCommon!(getConfiguration, OpenCloseMode.close)(driveLetter);
+        return ejectableClosableCommon!getConfiguration(driveLetter, OpenCloseMode.close);
     }
 
     auto openImpl(string driveLetter)

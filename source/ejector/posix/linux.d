@@ -27,12 +27,12 @@ version (linux)
 
         auto ejectableImpl(string drivePathName)
         {
-            return ejectableClosableCommon!(getConfiguration, OpenCloseMode.open)(drivePathName);
+            return ejectableClosableCommon!getConfiguration(drivePathName, OpenCloseMode.open);
         }
 
         auto closableImpl(string drivePathName)
         {
-            return ejectableClosableCommon!(getConfiguration, OpenCloseMode.close)(drivePathName);
+            return ejectableClosableCommon!getConfiguration(drivePathName, OpenCloseMode.close);
         }
 
         private auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)

@@ -137,7 +137,7 @@ static assert(MechanismStatusHeader.sizeof == 8);
 
 // Goodies
 
-package bool ejectableClosableCommon(alias getConfigurationFunction, OpenCloseMode mode)(string driveName)
+package bool ejectableClosableCommon(alias getConfigurationFunction)(string driveName, OpenCloseMode mode)
 {
     auto response = RemovableMediumFeatureResponse();
     immutable ioctlResult = getConfigurationFunction(driveName, response);
@@ -163,15 +163,15 @@ package bool ejectableClosableCommon(alias getConfigurationFunction, OpenCloseMo
         return false;
     }
 
-    return parseEjectableClosable!mode(response);
+    return parseEjectableClosable(response, mode);
 }
 
-private bool parseEjectableClosable(OpenCloseMode mode)(RemovableMediumFeatureResponse response)
+private bool parseEjectableClosable(RemovableMediumFeatureResponse response, OpenCloseMode mode)
 {
 
     // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
     // Test the Eject bit
-    static if (mode == OpenCloseMode.open)
+    if (mode == OpenCloseMode.open)
     {
         return !!response.eject;
     }
