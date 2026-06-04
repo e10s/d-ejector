@@ -93,15 +93,12 @@ version (FreeBSD)
             immutable status = cam_send_ccb(camDevice, cast(ccb*) ccbLike.ptr);
             if (status == -1)
             {
-                import std.stdio : stderr, writeln;
-
                 immutable errorNumber = errno;
-                logError("cam_send_ccb failed, " ~ drivePathName, errorNumber);
-                stderr.writeln(cast(string) cam_errbuf);
+                logError("cam_send_ccb failed, " ~ drivePathName, errorNumber, cast(string) cam_errbuf);
                 return IoctlResult(false, IoctlErrorStage.ioctl, errorNumber);
             }
 
-            logError("cam_send_ccb succeeded, " ~ drivePathName, 0);
+            logGeneric("cam_send_ccb succeeded, " ~ drivePathName);
 
             return IoctlResult(true, IoctlErrorStage.none, 0);
         }
@@ -113,22 +110,10 @@ version (FreeBSD)
 
             if (ioctlResult.ok)
             {
-                debug (VerboseEjector)
-                {
-                    import std.stdio : stderr, writeln;
-
-                    stderr.writeln("status succeeded");
-                }
                 return parseStatus(mechanismStatusHeader);
             }
             else
             {
-                debug (VerboseEjector)
-                {
-                    import std.stdio : stderr, writeln;
-
-                    stderr.writeln("status failed");
-                }
                 return TrayStatus.ERROR;
             }
         }

@@ -56,7 +56,7 @@ version (Ejector_Posix) private
             return IoctlResult(false, IoctlErrorStage.ioctl, errorNumber);
         }
 
-        logError("ioctl succeeded, " ~ drivePathName, 0);
+        logGeneric("ioctl succeeded, " ~ drivePathName);
 
         return IoctlResult(true, IoctlErrorStage.none, 0);
     }

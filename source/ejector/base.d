@@ -143,21 +143,6 @@ package bool ejectableClosableCommon(alias getConfigurationFunction)(string driv
     auto response = RemovableMediumFeatureResponse();
     immutable ioctlResult = getConfigurationFunction(driveName, response);
 
-    debug (VerboseEjector)
-    {
-        import std.stdio : stderr, writeln;
-
-        if (ioctlResult.ok)
-        {
-            stderr.writeln("get configuration succeeded, ", driveName);
-            stderr.writeln(response);
-        }
-        else
-        {
-            stderr.writeln("get configuration failed, ", driveName);
-        }
-    }
-
     if (!ioctlResult.ok)
     {
         // We might have to execute MODE SENSE (10)
@@ -169,6 +154,14 @@ package bool ejectableClosableCommon(alias getConfigurationFunction)(string driv
 
 private bool parseEjectableClosable(RemovableMediumFeatureResponse response, OpenCloseMode mode)
 {
+    import std.conv : to;
+
+    logGeneric("[RemovableMediumFeatureResponse]",
+        "version: " ~ to!string(response.version_),
+        "eject: " ~ to!string(response.eject),
+        "load: " ~ to!string(response.load),
+        "mechanismType: " ~ to!string(response.loadingMechanismType)
+    );
 
     // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
     // Test the Eject bit
@@ -196,6 +189,11 @@ private bool parseEjectableClosable(RemovableMediumFeatureResponse response, Ope
 
 package TrayStatus parseStatus(MechanismStatusHeader mechanismStatusHeader)
 {
+    import std.conv : to;
+
+    logGeneric("[MechanismStatusHeader]",
+        "doorOpen: " ~ to!string(mechanismStatusHeader.doorOpen));
+
     // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.742
     return mechanismStatusHeader.doorOpen ? TrayStatus.OPEN : TrayStatus.CLOSED;
 }

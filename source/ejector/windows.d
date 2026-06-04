@@ -145,7 +145,7 @@ version (Windows) private
             return IoctlResult(false, IoctlErrorStage.ioctl, errorNumber);
         }
 
-        logError("ioctl succeeded, " ~ driveLetter, 0);
+        logGeneric("ioctl succeeded, " ~ driveLetter);
 
         return IoctlResult(true, IoctlErrorStage.none, 0);
     }
@@ -224,31 +224,12 @@ version (Windows) package
 
         immutable ioctlResult = ioctlWrapper(driveLetter, IOCTL_SCSI_PASS_THROUGH_DIRECT, &ioctlIO, &ioctlIO);
 
-        debug (VerboseEjector)
-        {
-            import std.stdio : stderr, writeln;
-
-            stderr.writeln(mechanismStatusHeader);
-        }
-
         if (ioctlResult.ok && ioctlIO.ScsiStatus == 0)
         {
-            debug (VerboseEjector)
-            {
-                import std.stdio : stderr, writeln;
-
-                stderr.writeln("status succeeded");
-            }
             return parseStatus(mechanismStatusHeader);
         }
         else
         {
-            debug (VerboseEjector)
-            {
-                import std.stdio : stderr, writeln;
-
-                stderr.writeln("status failed");
-            }
             return TrayStatus.ERROR;
         }
     }
