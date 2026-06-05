@@ -115,14 +115,17 @@ version (Windows) private
     IoctlResult ioctlWrapper(Command, IoctlInput = void, IoctlOutput = void)(string driveLetter, Command command,
         IoctlInput* ioctlInputPointer, IoctlOutput* ioctlOutputPointer)
     {
-        auto handle = createDriveHandle(driveLetter);
+        auto driveHandle = createDriveHandle(driveLetter);
+        auto handle = driveHandle.handle;
         scope (exit)
+        {
             handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
+        }
 
         if (handle == INVALID_HANDLE_VALUE)
         {
             immutable errorNumber = GetLastError;
-            logError("open failed, " ~ driveLetter, errorNumber);
+            logError("open failed, " ~ driveHandle.drivePath, errorNumber);
             return IoctlResult(false, IoctlErrorStage.open, errorNumber);
         }
 
@@ -187,6 +190,11 @@ version (Windows) private
         }
     }
 
+    import std.traits : ReturnType;
+    import std.typecons : Tuple;
+
+    alias DriveHandle = Tuple!(string, "drivePath", ReturnType!CreateFile, "handle");
+
     auto createDriveHandle(string driveLetter)
     {
         import std.utf : toUTF16z;
@@ -197,7 +205,7 @@ version (Windows) private
         auto handle = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
 
-        return handle;
+        return DriveHandle(drivePath, handle);
     }
 
     auto getConfiguration(string driveLetter, ref RemovableMediumFeatureResponse response)
