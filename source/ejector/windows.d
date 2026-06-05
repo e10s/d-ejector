@@ -155,25 +155,35 @@ version (Windows) private
         return ioctlWrapper(driveLetter, command, null, null);
     }
 
-    // Select the first optical drive in alphabetical order.
-    @property auto defaultDrive()
+    import std.traits : isSomeString, isSomeChar;
+
+    auto isCDDrive(T)(T driveLetter)
+    if (isSomeString!T || isSomeChar!T)
     {
-        import std.algorithm : find, map;
-        import std.ascii : uppercase;
+        import std.conv : to;
         import std.utf : toUTF16z;
         import core.sys.windows.winbase : DRIVE_CDROM, GetDriveType;
 
-        auto driveLetters = uppercase.map!(a => (cast(char) a))
-            .find!(a => GetDriveType(toUTF16z(a ~ `:\`)) == DRIVE_CDROM);
+        return GetDriveType(toUTF16z(driveLetter.to!string ~ `:\`)) == DRIVE_CDROM;
+    }
+
+    // Select the first optical drive in alphabetical order.
+    @property auto defaultDrive()
+    {
+        import std.algorithm : find;
+        import std.ascii : uppercase;
+        import std.utf : byChar;
+
+        auto driveLetters = uppercase.byChar.find!isCDDrive;
         if (driveLetters.empty)
         {
             return "";
         }
         else
         {
-            import std.conv : text;
+            import std.conv : to;
 
-            return driveLetters.front.text;
+            return driveLetters.front.to!string;
         }
     }
 
