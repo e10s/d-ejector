@@ -32,7 +32,8 @@ struct Ejector
             // "a" to "z" or "A" to "Z"
             import std.uni : isAlpha, toUpper;
 
-            if (driveLetter.length == 1 && driveLetter[0].isAlpha)
+            if ((driveLetter.length == 1 && driveLetter[0].isAlpha) ||
+                (driveLetter.length == 2 && driveLetter[0].isAlpha && driveLetter[1] == ':'))
             {
                 drive = driveLetter.toUpper;
             }
