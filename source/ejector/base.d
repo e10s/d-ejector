@@ -15,6 +15,7 @@ package enum IoctlErrorStage
 
 import std.typecons : Tuple;
 
+package alias GetTargetDriveResult = Tuple!(bool, "ok", string, "name");
 package alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNumber");
 
 package void logGeneric(T...)(lazy string message, lazy T additionalMessages, string caller = __FUNCTION__)

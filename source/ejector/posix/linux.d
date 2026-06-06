@@ -10,6 +10,20 @@ version (linux)
 {
     package mixin template LinuxImpl()
     {
+        // INDEV
+        auto getTargetDrive(string drivePathName)
+        {
+            if (drivePathName == "")
+            {
+                immutable defaultDrive = "/dev/cdrom";
+                logGeneric("Target drive: <" ~ defaultDrive ~ ">");
+                return GetTargetDriveResult(true, defaultDrive);
+            }
+
+            logGeneric("Target drive: <" ~ drivePathName ~ ">");
+            return GetTargetDriveResult(true, drivePathName);
+        }
+
         auto statusImpl(string drivePathName)
         {
             int status = -1;

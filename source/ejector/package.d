@@ -44,37 +44,56 @@ struct Ejector
             this(cast(string)[driveLetter]);
         }
     }
-    else version (linux)
-    {
-        private string drive = "/dev/cdrom";
-    }
-    else version (FreeBSD)
-    {
-        private string drive = "/dev/cd0";
-    }
+
     ///
     @property auto status()
     {
-        return statusImpl(drive);
+        immutable targetDrive = getTargetDrive(drive);
+        if (!targetDrive.ok)
+        {
+            return TrayStatus.ERROR;
+        }
+
+        return statusImpl(targetDrive.name);
     }
     ///
     @property auto ejectable()
     {
-        return ejectableImpl(drive);
+        immutable targetDrive = getTargetDrive(drive);
+        if (!targetDrive.ok)
+        {
+            return false;
+        }
+        return ejectableImpl(targetDrive.name);
     }
     ///
     @property auto closable()
     {
-        return closableImpl(drive);
+        immutable targetDrive = getTargetDrive(drive);
+        if (!targetDrive.ok)
+        {
+            return false;
+        }
+        return closableImpl(targetDrive.name);
     }
     ///
     auto open()
     {
-        return openImpl(drive);
+        immutable targetDrive = getTargetDrive(drive);
+        if (!targetDrive.ok)
+        {
+            return false;
+        }
+        return openImpl(targetDrive.name);
     }
     ///
     auto close()
     {
-        return closeImpl(drive);
+        immutable targetDrive = getTargetDrive(drive);
+        if (!targetDrive.ok)
+        {
+            return false;
+        }
+        return closeImpl(targetDrive.name);
     }
 }

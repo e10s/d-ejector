@@ -221,6 +221,27 @@ version (Windows) private
 
 version (Windows) package
 {
+    auto getTargetDrive(string driveLetter)
+    {
+        if (driveLetter == "")
+        {
+            immutable defaultDrive_ = defaultDrive;
+            if (defaultDrive_ == "")
+            {
+                logGeneric("No optical drive [A-Z] found");
+                return GetTargetDriveResult(false, "");
+            }
+            else
+            {
+                logGeneric("Target drive: <" ~ defaultDrive_ ~ ">");
+                return GetTargetDriveResult(true, defaultDrive_);
+            }
+        }
+
+        logGeneric("Target drive: <" ~ driveLetter ~ ">");
+        return GetTargetDriveResult(true, driveLetter);
+    }
+
     auto statusImpl(string driveLetter)
     {
         enum ioctlIOSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);

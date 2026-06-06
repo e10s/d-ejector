@@ -103,6 +103,20 @@ version (FreeBSD)
             return IoctlResult(true, IoctlErrorStage.none, 0);
         }
 
+        // INDEV
+        auto getTargetDrive(string drivePathName)
+        {
+            if (drivePathName == "")
+            {
+                immutable defaultDrive = "/dev/cd0";
+                logGeneric("Target drive: <" ~ defaultDrive ~ ">");
+                return GetTargetDriveResult(true, defaultDrive);
+            }
+
+            logGeneric("Target drive: <" ~ drivePathName ~ ">");
+            return GetTargetDriveResult(true, drivePathName);
+        }
+
         auto statusImpl(string drivePathName)
         {
             auto mechanismStatusHeader = MechanismStatusHeader();
