@@ -14,10 +14,12 @@ version (Windows)
 }
 else version (linux)
 {
+    version = Ejector_Posix;
     import ejector.posix;
 }
 else version (FreeBSD)
 {
+    version = Ejector_Posix;
     import ejector.posix;
 }
 ///
@@ -42,6 +44,20 @@ struct Ejector
         this(char driveLetter)
         {
             this(cast(string)[driveLetter]);
+        }
+    }
+    version (Ejector_Posix)
+    {
+        ///
+        this(string drivePathName)
+        {
+            import std.path : absolutePath, buildNormalizedPath;
+
+            immutable normalizedPath = buildNormalizedPath(absolutePath(drivePathName));
+            if (normalizedPath.length)
+            {
+                drive = normalizedPath;
+            }
         }
     }
 
