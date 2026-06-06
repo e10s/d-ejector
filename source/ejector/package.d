@@ -23,9 +23,9 @@ else version (FreeBSD)
 ///
 struct Ejector
 {
+    private string drive = "";
     version (Windows)
     {
-        private string drive = "";
         ///
         this(string driveLetter)
         {
