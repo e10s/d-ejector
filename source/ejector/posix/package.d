@@ -78,4 +78,102 @@ version (Ejector_Posix) private
         allocationLength: [0, RemovableMediumFeatureResponse.sizeof],
     };
 
+    @property auto defaultDrive()
+    {
+        import std.file : exists;
+        import std.path : buildPath;
+
+        immutable devPath = "/dev";
+        immutable devCdromPath = buildPath(devPath, "cdrom");
+
+        if (devCdromPath.exists)
+        {
+            return devCdromPath;
+        }
+
+        import std.concurrency : Generator;
+
+        auto r = new Generator!size_t({
+            import std.file : FileException;
+
+            try
+            {
+                import std.file : dirEntries, SpanMode;
+
+                foreach (entry; dirEntries(devPath, SpanMode.shallow))
+                {
+                    try
+                    {
+                        import std.algorithm : startsWith;
+                        import std.path : baseName;
+
+                        if (entry.isDir || entry.isFile)
+                        {
+                            // entry is NOT a special file!
+                            continue;
+                        }
+
+                        if (entry.baseName.startsWith(cdDrivePrefix))
+                        {
+                            immutable deviceNumber = entry.baseName[cdDrivePrefix.length .. $];
+
+                            import std.algorithm : all;
+                            import std.ascii : isDigit;
+                            import std.utf : byChar;
+
+                            if (deviceNumber != "" && deviceNumber.byChar.all!isDigit)
+                            {
+                                import std.concurrency : yield;
+                                import std.conv : to;
+
+                                yield(deviceNumber.to!size_t);
+                            }
+                        }
+                    }
+                    catch (FileException fe)
+                    {
+                        continue;
+                    }
+                }
+            }
+            catch (FileException fe)
+            {
+            }
+        });
+
+        if (r.empty)
+        {
+            return "";
+        }
+
+        import std.algorithm : minElement;
+        import std.conv : to;
+
+        return buildPath(devPath, cdDrivePrefix ~ r.minElement.to!string);
+    }
+}
+
+version (Ejector_Posix) package(ejector)
+{
+    auto getTargetDrive(string drivePathName)
+    {
+        if (drivePathName == "")
+        {
+            immutable defaultDrive_ = defaultDrive;
+
+            if (defaultDrive_ == "")
+            {
+                logGeneric("No optical drive /dev/cdrom or /dev/" ~ cdDrivePrefix ~ "* found");
+                return GetTargetDriveResult(false, "");
+            }
+            else
+            {
+                logGeneric("Target drive: <" ~ defaultDrive_ ~ ">");
+                return GetTargetDriveResult(true, defaultDrive_);
+            }
+        }
+
+        logGeneric("Target drive: <" ~ drivePathName ~ ">");
+        return GetTargetDriveResult(true, drivePathName);
+    }
 }
