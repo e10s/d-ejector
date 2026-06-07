@@ -25,7 +25,7 @@ else version (FreeBSD)
 ///
 struct Ejector
 {
-    private string drive = "";
+    private immutable string drive = "";
     version (Windows)
     {
         ///
@@ -37,7 +37,7 @@ struct Ejector
             if ((driveLetter.length == 1 && driveLetter[0].isAlpha) ||
                 (driveLetter.length == 2 && driveLetter[0].isAlpha && driveLetter[1] == ':'))
             {
-                drive = driveLetter.toUpper;
+                drive = driveLetter.toUpper.idup;
             }
         }
         ///
@@ -53,7 +53,7 @@ struct Ejector
         {
             import std.path : absolutePath, buildNormalizedPath;
 
-            immutable normalizedPath = buildNormalizedPath(absolutePath(drivePathName));
+            immutable normalizedPath = buildNormalizedPath(absolutePath(drivePathName)).idup;
             if (normalizedPath.length)
             {
                 drive = normalizedPath;
