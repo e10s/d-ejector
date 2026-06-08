@@ -18,6 +18,9 @@
 # Executables
 *.exe
 
+# Debug files
+*.pdb
+
 # DUB
 .dub
 docs.json
