@@ -30,6 +30,7 @@ version (Ejector_Posix) private
     }
 
     IoctlResult ioctlWrapper(Command, T)(string drivePathName, Command command, ref int status, T third)
+    in (drivePathName.length > 0)
     {
         import core.stdc.errno : errno;
         import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, open;
@@ -156,6 +157,7 @@ version (Ejector_Posix) private
 version (Ejector_Posix) package(ejector)
 {
     auto getTargetDrive(string drivePathName)
+    out (r; r.name.length > 0 || !r.ok)
     {
         if (drivePathName == "")
         {

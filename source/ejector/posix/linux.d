@@ -13,6 +13,7 @@ version (linux)
         package immutable cdDrivePrefix = "sr";
 
         auto statusImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             int status = -1;
             immutable ioctlResult = ioctlWrapper(drivePathName, CDROM_DRIVE_STATUS, status);
@@ -28,16 +29,19 @@ version (linux)
         }
 
         auto ejectableImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             return ejectableClosableCommon!getConfiguration(drivePathName, OpenCloseMode.open);
         }
 
         auto closableImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             return ejectableClosableCommon!getConfiguration(drivePathName, OpenCloseMode.close);
         }
 
         private auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
+        in (drivePathName.length > 0)
         {
             sg_io_hdr header = {
                 interface_id: SG_INTERFACE_ID_ORIG,
@@ -55,11 +59,13 @@ version (linux)
         }
 
         auto openImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             return ioctlWrapper(drivePathName, CDROMEJECT).ok;
         }
 
         auto closeImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             return ioctlWrapper(drivePathName, CDROMCLOSETRAY).ok;
         }

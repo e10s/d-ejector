@@ -114,6 +114,7 @@ version (Windows) private
 
     IoctlResult ioctlWrapper(Command, IoctlInput = void, IoctlOutput = void)(string driveLetter, Command command,
         IoctlInput* ioctlInputPointer, IoctlOutput* ioctlOutputPointer)
+    in (isValidDriveLetter(driveLetter))
     {
         auto driveHandle = createDriveHandle(driveLetter);
         auto handle = driveHandle.handle;
@@ -158,6 +159,13 @@ version (Windows) private
         return ioctlWrapper(driveLetter, command, null, null);
     }
 
+    auto isValidDriveLetter(string driveLetter)
+    {
+        import std.uni : isAlpha;
+
+        return driveLetter.length == 1 && driveLetter[0].isAlpha;
+    }
+
     import std.traits : isSomeString, isSomeChar;
 
     auto isCDDrive(T)(T driveLetter)
@@ -196,11 +204,11 @@ version (Windows) private
     alias DriveHandle = Tuple!(string, "drivePath", ReturnType!CreateFile, "handle");
 
     auto createDriveHandle(string driveLetter)
+    in (isValidDriveLetter(driveLetter))
     {
         import std.utf : toUTF16z;
 
-        immutable drivePath = `\\.\` ~
-            (driveLetter == "" ? defaultDrive : driveLetter) ~ ":";
+        immutable drivePath = `\\.\` ~ driveLetter ~ ":";
 
         auto handle = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
@@ -209,6 +217,7 @@ version (Windows) private
     }
 
     auto getConfiguration(string driveLetter, ref RemovableMediumFeatureResponse response)
+    in (isValidDriveLetter(driveLetter))
     {
         GET_CONFIGURATION_IOCTL_INPUT ioctlInput = {
             Feature: FEATURE_NUMBER.FeatureRemovableMedium,
@@ -222,6 +231,7 @@ version (Windows) private
 version (Windows) package
 {
     auto getTargetDrive(string driveLetter)
+    out (r; r.name.length > 0 || !r.ok)
     {
         if (driveLetter == "")
         {
@@ -243,6 +253,7 @@ version (Windows) package
     }
 
     auto statusImpl(string driveLetter)
+    in (isValidDriveLetter(driveLetter))
     {
         enum ioctlIOSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
 
@@ -274,21 +285,25 @@ version (Windows) package
     }
 
     auto ejectableImpl(string driveLetter)
+    in (isValidDriveLetter(driveLetter))
     {
         return ejectableClosableCommon!getConfiguration(driveLetter, OpenCloseMode.open);
     }
 
     auto closableImpl(string driveLetter)
+    in (isValidDriveLetter(driveLetter))
     {
         return ejectableClosableCommon!getConfiguration(driveLetter, OpenCloseMode.close);
     }
 
     auto openImpl(string driveLetter)
+    in (isValidDriveLetter(driveLetter))
     {
         return ioctlWrapper(driveLetter, IOCTL_STORAGE_EJECT_MEDIA).ok;
     }
 
     auto closeImpl(string driveLetter)
+    in (isValidDriveLetter(driveLetter))
     {
         return ioctlWrapper(driveLetter, IOCTL_STORAGE_LOAD_MEDIA).ok;
     }

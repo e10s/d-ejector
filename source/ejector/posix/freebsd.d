@@ -64,6 +64,7 @@ version (FreeBSD)
         }
 
         private auto camCommander(CDB, Response)(string drivePathName, CDB cdb, ref Response response)
+        in (drivePathName.length > 0)
         {
             import core.stdc.errno : errno;
             import core.sys.posix.fcntl : O_RDWR;
@@ -106,6 +107,7 @@ version (FreeBSD)
         package immutable cdDrivePrefix = "cd";
 
         auto statusImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             auto mechanismStatusHeader = MechanismStatusHeader();
             immutable ioctlResult = camCommander(drivePathName, mechanismStatusCDB, mechanismStatusHeader);
@@ -121,26 +123,31 @@ version (FreeBSD)
         }
 
         auto ejectableImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             return ejectableClosableCommon!getConfiguration(drivePathName, OpenCloseMode.open);
         }
 
         auto closableImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             return ejectableClosableCommon!getConfiguration(drivePathName, OpenCloseMode.close);
         }
 
         private auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
+        in (drivePathName.length > 0)
         {
             return camCommander(drivePathName, getConfigurationCDB, response);
         }
 
         auto openImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             return ioctlWrapper(drivePathName, Command.CDIOCEJECT).ok;
         }
 
         auto closeImpl(string drivePathName)
+        in (drivePathName.length > 0)
         {
             return ioctlWrapper(drivePathName, Command.CDIOCCLOSE).ok;
         }
