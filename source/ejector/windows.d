@@ -95,7 +95,10 @@ version (Windows) private
     alias IOCTL_CDROM_BASE = FILE_DEVICE_CD_ROM;
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
             METHOD_BUFFERED, FILE_READ_ACCESS);
+}
 
+version (Windows) private
+{
     void logError(T...)(lazy string message, uint errorNumber, lazy T additionalMessages, string caller = __FUNCTION__)
     {
         debug (VerboseEjector)

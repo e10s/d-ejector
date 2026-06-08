@@ -6,12 +6,33 @@ Distributed under the Boost Software License, Version 1.0.
 
 module ejector.posix.linux;
 
-version (linux)
+version (linux) package(ejector.posix) mixin template LinuxImpl()
 {
-    package mixin template LinuxImpl()
+    package(ejector.posix)
     {
-        package immutable cdDrivePrefix = "sr";
+        immutable cdDrivePrefix = "sr";
 
+        auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
+        in (drivePathName.length > 0)
+        {
+            sg_io_hdr header = {
+                interface_id: SG_INTERFACE_ID_ORIG,
+                dxfer_direction: SG_DXFER_FROM_DEV,
+                cmd_len: GetConfigurationCDB.sizeof,
+                dxfer_len: RemovableMediumFeatureResponse.sizeof,
+                dxferp: &response,
+                cmdp: cast(ubyte*)&getConfigurationCDB,
+                sbp: null,
+                timeout: 5000
+            };
+
+            int status;
+            return ioctlWrapper(drivePathName, SG_IO, status, &header);
+        }
+    }
+
+    package(ejector)
+    {
         auto statusImpl(string drivePathName)
         in (drivePathName.length > 0)
         {
@@ -38,24 +59,6 @@ version (linux)
         in (drivePathName.length > 0)
         {
             return ejectableClosableCommon!getConfiguration(drivePathName, OpenCloseMode.close);
-        }
-
-        private auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
-        in (drivePathName.length > 0)
-        {
-            sg_io_hdr header = {
-                interface_id: SG_INTERFACE_ID_ORIG,
-                dxfer_direction: SG_DXFER_FROM_DEV,
-                cmd_len: GetConfigurationCDB.sizeof,
-                dxfer_len: RemovableMediumFeatureResponse.sizeof,
-                dxferp: &response,
-                cmdp: cast(ubyte*)&getConfigurationCDB,
-                sbp: null,
-                timeout: 5000
-            };
-
-            int status;
-            return ioctlWrapper(drivePathName, SG_IO, status, &header);
         }
 
         auto openImpl(string drivePathName)

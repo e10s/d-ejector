@@ -11,9 +11,12 @@ import ejector.base;
 version (FreeBSD)
 {
     pragma(lib, "cam");
-    package mixin template FreeBSDImpl()
-    {
+}
 
+version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
+{
+    package(ejector.posix)
+    {
         /*
         Generated from ccb.c
 
@@ -21,49 +24,52 @@ version (FreeBSD)
         enum CCB_CDB_LEN_OFFSET = ??;
         enum CCB_CDB_BYTES_OFFSET = ??;
         */
-        private mixin(import("ccb.mixin"));
+        mixin(import("ccb.mixin"));
 
         // cam/cam_ccb.h
         // https://github.com/freebsd/freebsd/blob/master/sys/cam/cam_ccb.h
-        private enum ccb_flags
+        enum ccb_flags
         {
             CAM_DIR_IN = 0x00000040
         }
 
-        private union ccb;
-        private struct ccb_scsiio;
+        union ccb;
+        struct ccb_scsiio;
 
-        private extern (C) int csio_build(ccb_scsiio*, ubyte*, uint, uint, int, int,
+        extern (C) int csio_build(ccb_scsiio*, ubyte*, uint, uint, int, int,
             const(char)*, ...);
 
         // camlib.h
         // https://github.com/freebsd/freebsd/blob/master/lib/libcam/camlib.h
-        private enum CAM_ERRBUF_SIZE = 2048;
-        private struct cam_device;
+        enum CAM_ERRBUF_SIZE = 2048;
+        struct cam_device;
 
-        private extern (C) __gshared ubyte[CAM_ERRBUF_SIZE] cam_errbuf;
-        private extern (C) cam_device* cam_open_device(const(char)*, int);
-        private extern (C) void cam_close_device(cam_device*);
-        private extern (C) int cam_send_ccb(cam_device*, ccb*);
+        extern (C) __gshared ubyte[CAM_ERRBUF_SIZE] cam_errbuf;
+        extern (C) cam_device* cam_open_device(const(char)*, int);
+        extern (C) void cam_close_device(cam_device*);
+        extern (C) int cam_send_ccb(cam_device*, ccb*);
 
         // sys/ioccom.h
         // https://github.com/freebsd/freebsd/blob/master/sys/sys/ioccom.h
-        private enum IOCPARM_SHIFT = 13;
-        private enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
-        private enum IOC_VOID = 0x20000000;
-        private enum _IOC(uint inout_, uint group, uint num, uint len) =
+        enum IOCPARM_SHIFT = 13;
+        enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
+        enum IOC_VOID = 0x20000000;
+        enum _IOC(uint inout_, uint group, uint num, uint len) =
             uint(inout_ | ((len & IOCPARM_MASK) << 16) | (group << 8) | num);
-        private enum _IO(uint g, uint n) = _IOC!(IOC_VOID, g, n, 0);
+        enum _IO(uint g, uint n) = _IOC!(IOC_VOID, g, n, 0);
 
         // sys/cdio.h
         // https://github.com/freebsd/freebsd/blob/master/sys/sys/cdio.h
-        private enum Command
+        enum Command
         {
             CDIOCEJECT = _IO!('c', 24),
             CDIOCCLOSE = _IO!('c', 28),
         }
+    }
 
-        private auto camCommander(CDB, Response)(string drivePathName, CDB cdb, ref Response response)
+    package(ejector.posix)
+    {
+        auto camCommander(CDB, Response)(string drivePathName, CDB cdb, ref Response response)
         in (drivePathName.length > 0)
         {
             import core.stdc.errno : errno;
@@ -104,8 +110,17 @@ version (FreeBSD)
             return IoctlResult(true, IoctlErrorStage.none, 0);
         }
 
-        package immutable cdDrivePrefix = "cd";
+        immutable cdDrivePrefix = "cd";
 
+        auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
+        in (drivePathName.length > 0)
+        {
+            return camCommander(drivePathName, getConfigurationCDB, response);
+        }
+    }
+
+    package(ejector)
+    {
         auto statusImpl(string drivePathName)
         in (drivePathName.length > 0)
         {
@@ -132,12 +147,6 @@ version (FreeBSD)
         in (drivePathName.length > 0)
         {
             return ejectableClosableCommon!getConfiguration(drivePathName, OpenCloseMode.close);
-        }
-
-        private auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
-        in (drivePathName.length > 0)
-        {
-            return camCommander(drivePathName, getConfigurationCDB, response);
         }
 
         auto openImpl(string drivePathName)
