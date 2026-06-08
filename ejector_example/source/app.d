@@ -6,90 +6,77 @@ Distributed under the Boost Software License, Version 1.0.
 
 import ejector;
 
-version(FreeBSD)
-void main()
+void testDrive(ref Ejector e)
 {
-    // Assign a device and test the drive.
-    auto e1 = Ejector("/dev/cd0");
-    e1.ejectable;
+    import std.stdio : writeln;
 
-    // Try to get the default "/dev/cd0" open.
-    auto e2 = Ejector();
-    e2.open();
+    writeln("Ejectable?: ", e.ejectable);
+    writeln("Closable?: ", e.closable);
 
-    // Search for ejectable drives and try to toggle open/closed.
-    import std.algorithm, std.stdio, std.typecons;
-    foreach (e; ["/dev/stdin", "/dev/null", "/dev/dvd", "/no/such/device"]
-        .map!(a => tuple(a, Ejector(a))).filter!(a => a[1].ejectable))
+    immutable status = e.status;
+    writeln("Current status: ", status);
+
+    if (status == TrayStatus.ERROR)
     {
-        writeln(e[0] ~ " is ejectable!");
-        auto status = e[1].status;
-        if (status == TrayStatus.OPEN)
-        {
-            e[1].close();
-        }
-        else if (status == TrayStatus.CLOSED)
-        {
-            e[1].open();
-        }
+        return;
     }
+
+    // Try to toggle the drive open/closed.
+    if (status == TrayStatus.OPEN)
+    {
+        immutable result = e.close();
+        writeln("Tried to close the drive... ", result);
+    }
+    else if (status == TrayStatus.CLOSED)
+    {
+        immutable result = e.open();
+        writeln("Tried to open the drive... ", result);
+    }
+
+    writeln("New status: ", e.status);
 }
 
-
-version(linux)
 void main()
 {
-    // Assign a device and test the drive.
-    auto e1 = Ejector("/dev/sr0");
-    e1.ejectable;
-
-    // Try to get the default "/dev/cdrom" open.
-    auto e2 = Ejector();
-    e2.open();
-
-    // Search for ejectable drives and try to toggle open/closed.
-    import std.algorithm, std.stdio, std.typecons;
-    foreach (e; ["/dev/stdin", "/dev/null", "/dev/dvd", "/no/such/device"]
-        .map!(a => tuple(a, Ejector(a))).filter!(a => a[1].ejectable))
+    version (linux)
     {
-        writeln(e[0] ~ " is ejectable!");
-        auto status = e[1].status;
-        if (status == TrayStatus.OPEN)
-        {
-            e[1].close();
-        }
-        else if (status == TrayStatus.CLOSED)
-        {
-            e[1].open();
-        }
+        auto targets = [
+            "/dev/sr0", "/dev/sr1", "/dev/null", "/../root", "/no/such/device", "what about this/../how about this?"
+        ];
     }
-}
-
-
-version(Windows)
-void main()
-{
-    // Assign a drive letter and test the drive.
-    auto e1 = Ejector("f");
-    e1.ejectable;
-
-    // Try to get an automatically selected drive open.
-    auto e2 = Ejector();
-    e2.open();
-
-    // Search for all ejectable drives and try to toggle open/closed.
-    import std.algorithm, std.ascii;
-    foreach (e; uppercase.map!(a => Ejector(cast(char)a))
-        .filter!(a => a.ejectable))
+    version (FreeBSD)
     {
-        auto status = e.status;
-        if (status == TrayStatus.OPEN)
-        {
-            e.close();
-        }
-        else if (status == TrayStatus.CLOSED)
-        {
-            e.open();
-        }
+        auto targets = [
+            "/dev/cd0", "/dev/cd1", "/dev/null", "/../root", "/no/such/device", "what about this/../how about this?"
+        ];
+    }
+    version (Windows)
+    {
+        auto targets = [
+            "e", "F", "c:\\windows", "whats", "what about this/../how about this?"
+        ];
+    }
+
+    // Assign a device and test it.
+    auto ejectorSpecified = Ejector(targets[0]);
+    testDrive(ejectorSpecified);
+
+    // Try to automatically obtain the default drive and test it.
+    auto ejectorDefault = Ejector();
+    testDrive(ejectorDefault);
+
+    // Search for ejectable drives and try to get their information.
+    foreach (drive; targets[1 .. $])
+    {
+        import std.stdio : writeln;
+        import std.typecons : tuple;
+
+        writeln("Testing ", drive, "...");
+
+        auto ejector = Ejector(drive);
+
+        immutable info = tuple!("Ejectable", "Closable", "Status")(ejector.ejectable, ejector.closable, ejector.status);
+        writeln(info);
+
     }
 }
