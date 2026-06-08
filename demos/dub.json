@@ -1,0 +1,15 @@
+{
+    "name": "demos",
+    "description": "Example usage of d-ejector.",
+    "copyright": "Copyright (C) 2015, electrolysis",
+    "license": "BSL-1.0",
+    "authors": [
+        "electrolysis"
+    ],
+    "dependencies": {
+        "d-ejector": {
+            "path": "../"
+        }
+    },
+    "targetType": "executable"
+}
