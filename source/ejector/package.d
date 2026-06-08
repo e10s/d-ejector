@@ -62,7 +62,7 @@ struct Ejector
     }
 
     ///
-    @property auto status()
+    @property auto status() const
     {
         immutable targetDrive = getTargetDrive(drive);
         if (!targetDrive.ok)
@@ -73,7 +73,7 @@ struct Ejector
         return statusImpl(targetDrive.name);
     }
     ///
-    @property auto ejectable()
+    @property auto ejectable() const
     {
         immutable targetDrive = getTargetDrive(drive);
         if (!targetDrive.ok)
@@ -83,7 +83,7 @@ struct Ejector
         return ejectableImpl(targetDrive.name);
     }
     ///
-    @property auto closable()
+    @property auto closable() const
     {
         immutable targetDrive = getTargetDrive(drive);
         if (!targetDrive.ok)
@@ -93,7 +93,7 @@ struct Ejector
         return closableImpl(targetDrive.name);
     }
     ///
-    auto open()
+    auto open() const
     {
         immutable targetDrive = getTargetDrive(drive);
         if (!targetDrive.ok)
@@ -103,7 +103,7 @@ struct Ejector
         return openImpl(targetDrive.name);
     }
     ///
-    auto close()
+    auto close() const
     {
         immutable targetDrive = getTargetDrive(drive);
         if (!targetDrive.ok)
