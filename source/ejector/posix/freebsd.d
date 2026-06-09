@@ -44,7 +44,7 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
         enum CAM_ERRBUF_SIZE = 2048;
         struct cam_device;
 
-        extern (C) __gshared ubyte[CAM_ERRBUF_SIZE] cam_errbuf;
+        extern (C) extern __gshared ubyte[CAM_ERRBUF_SIZE] cam_errbuf;
         extern (C) cam_device* cam_open_device(const(char)*, int);
         extern (C) void cam_close_device(cam_device*);
         extern (C) int cam_send_ccb(cam_device*, ccb*);
