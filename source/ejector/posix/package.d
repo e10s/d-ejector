@@ -18,7 +18,8 @@ version (FreeBSD)
 
 version (Ejector_Posix) private
 {
-    void logError(T...)(lazy string message, int errorNumber, lazy T additionalMessages, string caller = __FUNCTION__)
+    void logError(T...)(lazy string message, int errorNumber,
+            lazy T additionalMessages, string caller = __FUNCTION__)
     {
         debug (VerboseEjector)
         {
@@ -29,7 +30,8 @@ version (Ejector_Posix) private
         }
     }
 
-    IoctlResult ioctlWrapper(Command, T)(string drivePathName, Command command, ref int status, T third)
+    IoctlResult ioctlWrapper(Command, T)(string drivePathName, Command command,
+            ref int status, T third)
     in (drivePathName.length > 0)
     {
         import core.stdc.errno : errno;
@@ -74,12 +76,12 @@ version (Ejector_Posix) private
     }
 
     static immutable GetConfigurationCDB getConfigurationCDB = {
-        rt: 0x02,
-        startingFeatureNumber: [0, 0x03],
-        allocationLength: [0, RemovableMediumFeatureResponse.sizeof],
+        rt: 0x02, startingFeatureNumber: [0, 0x03], allocationLength: [
+            0, RemovableMediumFeatureResponse.sizeof
+        ],
     };
 
-    @property auto defaultDrive()
+    auto getDefaultDrive()
     {
         import std.file : exists;
         import std.path : buildPath;
@@ -89,7 +91,7 @@ version (Ejector_Posix) private
 
         if (devCdromPath.exists)
         {
-            return devCdromPath;
+            return GetDriveResult.ok(devCdromPath);
         }
 
         import std.concurrency : Generator;
@@ -144,38 +146,35 @@ version (Ejector_Posix) private
 
         if (r.empty)
         {
-            return "";
+            return GetDriveResult.err("Not found");
         }
 
         import std.algorithm : minElement;
         import std.conv : to;
 
-        return buildPath(devPath, cdDrivePrefix ~ r.minElement.to!string);
+        return GetDriveResult.ok(buildPath(devPath, cdDrivePrefix ~ r.minElement.to!string));
     }
 }
 
 version (Ejector_Posix) package(ejector)
 {
-    auto getTargetDrive(string drivePathName)
-    out (r; r.name.length > 0 || !r.ok)
+    GetDriveResult getTargetDrive(string drivePathName)
+    out (r)
     {
-        if (drivePathName == "")
-        {
-            immutable defaultDrive_ = defaultDrive;
+        import result : isErr, isOkAnd;
 
-            if (defaultDrive_ == "")
-            {
-                logGeneric("No optical drive /dev/cdrom or /dev/" ~ cdDrivePrefix ~ "* found");
-                return GetTargetDriveResult(false, "");
-            }
-            else
-            {
-                logGeneric("Target drive: <" ~ defaultDrive_ ~ ">");
-                return GetTargetDriveResult(true, defaultDrive_);
-            }
-        }
+        assert(r.isOkAnd!(t => t.length > 0) || r.isErr);
+    }
+    do
+    {
+        import result : mapErr, inspect, inspectErr;
 
-        logGeneric("Target drive: <" ~ drivePathName ~ ">");
-        return GetTargetDriveResult(true, drivePathName);
+        immutable getDriveResult = drivePathName == "" ? getDefaultDrive() : GetDriveResult.ok(
+                drivePathName);
+
+        return getDriveResult.mapErr!(
+                _ => "No optical drive /dev/cdrom or /dev/" ~ cdDrivePrefix ~ "* found")
+            .inspect!(t => logGeneric("Target drive: <" ~ t ~ ">"))
+            .inspectErr!(e => logGeneric(e));
     }
 }

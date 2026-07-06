@@ -14,11 +14,13 @@ package enum IoctlErrorStage
 }
 
 import std.typecons : Tuple;
+import result : Result;
 
-package alias GetTargetDriveResult = Tuple!(bool, "ok", string, "name");
+package alias GetDriveResult = Result!(string, string);
 package alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNumber");
 
-package void logGeneric(T...)(lazy string message, lazy T additionalMessages, string caller = __FUNCTION__)
+package void logGeneric(T...)(lazy string message, lazy T additionalMessages,
+        string caller = __FUNCTION__)
 {
     debug (VerboseEjector)
     {
@@ -70,7 +72,9 @@ package struct MechanismStatusCDB
 }
 
 static assert(MechanismStatusCDB.sizeof == 12);
-immutable MechanismStatusCDB mechanismStatusCDB = {allocationLength: [0, MechanismStatusHeader.sizeof]};
+immutable MechanismStatusCDB mechanismStatusCDB = {
+    allocationLength: [0, MechanismStatusHeader.sizeof]
+};
 
 // MMC-6 Command Response Data Structures
 
@@ -86,25 +90,17 @@ private mixin template FeatureHeader()
 private mixin template FeatureDescriptorHead()
 {
     ubyte[2] featureCode;
-    mixin(bitfields!(
-            ubyte, "current", 1,
-            ubyte, "persistent", 1,
-            ubyte, "version_", 4,
-            ubyte, "reserved0", 2
-    ));
+    mixin(bitfields!(ubyte, "current", 1, ubyte, "persistent", 1, ubyte,
+            "version_", 4, ubyte, "reserved0", 2));
     ubyte additionalLength;
 }
 
 private mixin template RemovableMediumFeatureDescriptorData()
 {
-    mixin(bitfields!(
-            ubyte, "lock", 1,
-            ubyte, "dbml", 1, // If version_ >= 2
+    mixin(bitfields!(ubyte, "lock", 1, ubyte, "dbml", 1, // If version_ >= 2
             ubyte, "pvntJmpr", 1,
-            ubyte, "eject", 1,
-            ubyte, "load", 1, // If version_ >= 1
-            ubyte, "loadingMechanismType", 3
-    ));
+            ubyte, "eject", 1, ubyte, "load", 1, // If version_ >= 1
+            ubyte, "loadingMechanismType", 3));
     ubyte[3] reserved3;
 }
 
@@ -119,17 +115,9 @@ static assert(RemovableMediumFeatureResponse.sizeof == 16);
 
 package struct MechanismStatusHeader
 {
-    mixin(bitfields!(
-            ubyte, "currentSlotLow5", 5,
-            ubyte, "changerState", 2,
-            ubyte, "fault", 1,
-    ));
-    mixin(bitfields!(
-            ubyte, "currentSlotHigh3", 3,
-            ubyte, "reserved0", 1,
-            ubyte, "doorOpen", 1,
-            ubyte, "mechanismState", 3,
-    ));
+    mixin(bitfields!(ubyte, "currentSlotLow5", 5, ubyte, "changerState", 2, ubyte, "fault", 1,));
+    mixin(bitfields!(ubyte, "currentSlotHigh3", 3, ubyte, "reserved0", 1,
+            ubyte, "doorOpen", 1, ubyte, "mechanismState", 3,));
     ubyte[3] currentLBA;
     ubyte numberOfSlotsAvailable;
     ubyte[2] lengthOfSlotTables;
@@ -139,7 +127,8 @@ static assert(MechanismStatusHeader.sizeof == 8);
 
 // Goodies
 
-package bool ejectableClosableCommon(alias getConfigurationFunction)(string driveName, OpenCloseMode mode)
+package bool ejectableClosableCommon(alias getConfigurationFunction)(
+        string driveName, OpenCloseMode mode)
 {
     auto response = RemovableMediumFeatureResponse();
     immutable ioctlResult = getConfigurationFunction(driveName, response);
@@ -157,12 +146,9 @@ private bool parseEjectableClosable(RemovableMediumFeatureResponse response, Ope
 {
     import std.conv : to;
 
-    logGeneric("[RemovableMediumFeatureResponse]",
-        "version: " ~ to!string(response.version_),
-        "eject: " ~ to!string(response.eject),
-        "load: " ~ to!string(response.load),
-        "mechanismType: " ~ to!string(response.loadingMechanismType)
-    );
+    logGeneric("[RemovableMediumFeatureResponse]", "version: " ~ to!string(response.version_),
+            "eject: " ~ to!string(response.eject), "load: " ~ to!string(response.load),
+            "mechanismType: " ~ to!string(response.loadingMechanismType));
 
     // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.638
     // Test the Eject bit
@@ -192,8 +178,7 @@ package TrayStatus parseStatus(MechanismStatusHeader mechanismStatusHeader)
 {
     import std.conv : to;
 
-    logGeneric("[MechanismStatusHeader]",
-        "doorOpen: " ~ to!string(mechanismStatusHeader.doorOpen));
+    logGeneric("[MechanismStatusHeader]", "doorOpen: " ~ to!string(mechanismStatusHeader.doorOpen));
 
     // ftp://ftp.seagate.com/sff/INF-8090.PDF, p.742
     return mechanismStatusHeader.doorOpen ? TrayStatus.OPEN : TrayStatus.CLOSED;

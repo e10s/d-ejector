@@ -34,8 +34,8 @@ struct Ejector
             // "a" to "z" or "A" to "Z"
             import std.uni : isAlpha, toUpper;
 
-            if ((driveLetter.length == 1 && driveLetter[0].isAlpha) ||
-                (driveLetter.length == 2 && driveLetter[0].isAlpha && driveLetter[1] == ':'))
+            if ((driveLetter.length == 1 && driveLetter[0].isAlpha)
+                    || (driveLetter.length == 2 && driveLetter[0].isAlpha && driveLetter[1] == ':'))
             {
                 drive = driveLetter.toUpper.idup;
             }
@@ -64,52 +64,62 @@ struct Ejector
     ///
     @property auto status() const
     {
+        import result : isErr, unwrap;
+
         immutable targetDrive = getTargetDrive(drive);
-        if (!targetDrive.ok)
+        if (targetDrive.isErr)
         {
             return TrayStatus.ERROR;
         }
 
-        return statusImpl(targetDrive.name);
+        return statusImpl(targetDrive.unwrap);
     }
     ///
     @property auto ejectable() const
     {
+        import result : isErr, unwrap;
+
         immutable targetDrive = getTargetDrive(drive);
-        if (!targetDrive.ok)
+        if (targetDrive.isErr)
         {
             return false;
         }
-        return ejectableImpl(targetDrive.name);
+        return ejectableImpl(targetDrive.unwrap);
     }
     ///
     @property auto closable() const
     {
+        import result : isErr, unwrap;
+
         immutable targetDrive = getTargetDrive(drive);
-        if (!targetDrive.ok)
+        if (targetDrive.isErr)
         {
             return false;
         }
-        return closableImpl(targetDrive.name);
+        return closableImpl(targetDrive.unwrap);
     }
     ///
     auto open() const
     {
+        import result : isErr, unwrap;
+
         immutable targetDrive = getTargetDrive(drive);
-        if (!targetDrive.ok)
+        if (targetDrive.isErr)
         {
             return false;
         }
-        return openImpl(targetDrive.name);
+        return openImpl(targetDrive.unwrap);
     }
     ///
     auto close() const
     {
+        import result : isErr, unwrap;
+
         immutable targetDrive = getTargetDrive(drive);
-        if (!targetDrive.ok)
+        if (targetDrive.isErr)
         {
             return false;
         }
-        return closeImpl(targetDrive.name);
+        return closeImpl(targetDrive.unwrap);
     }
 }

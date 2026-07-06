@@ -33,7 +33,7 @@ version (Windows) private
 
     alias IOCTL_SCSI_BASE = FILE_DEVICE_CONTROLLER;
     enum IOCTL_SCSI_PASS_THROUGH_DIRECT = CTL_CODE_T!(IOCTL_SCSI_BASE, 0x0405,
-            METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS);
+                METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS);
     enum SCSI_IOCTL_DATA_IN = 1;
 
     // ntddmmc.h
@@ -94,12 +94,13 @@ version (Windows) private
     // ntddcdrm.h
     alias IOCTL_CDROM_BASE = FILE_DEVICE_CD_ROM;
     enum IOCTL_CDROM_GET_CONFIGURATION = CTL_CODE_T!(IOCTL_CDROM_BASE, 0x0016,
-            METHOD_BUFFERED, FILE_READ_ACCESS);
+                METHOD_BUFFERED, FILE_READ_ACCESS);
 }
 
 version (Windows) private
 {
-    void logError(T...)(lazy string message, uint errorNumber, lazy T additionalMessages, string caller = __FUNCTION__)
+    void logError(T...)(lazy string message, uint errorNumber,
+            lazy T additionalMessages, string caller = __FUNCTION__)
     {
         debug (VerboseEjector)
         {
@@ -108,15 +109,14 @@ version (Windows) private
 
             char[512] buffer;
             FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, null, errorNumber,
-                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                buffer.ptr, buffer.length, null);
+                    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer.ptr, buffer.length, null);
 
             logGeneric!T(message ~ ": " ~ buffer.ptr.text.chomp, additionalMessages, caller);
         }
     }
 
-    IoctlResult ioctlWrapper(Command, IoctlInput = void, IoctlOutput = void)(string driveLetter, Command command,
-        IoctlInput* ioctlInputPointer, IoctlOutput* ioctlOutputPointer)
+    IoctlResult ioctlWrapper(Command, IoctlInput = void, IoctlOutput = void)(string driveLetter,
+            Command command, IoctlInput* ioctlInputPointer, IoctlOutput* ioctlOutputPointer)
     in (isValidDriveLetter(driveLetter))
     {
         auto driveHandle = createDriveHandle(driveLetter);
@@ -143,8 +143,8 @@ version (Windows) private
         {
             ioctlOutputSize = IoctlOutput.sizeof;
         }
-        immutable status = DeviceIoControl(handle, command,
-            ioctlInputPointer, ioctlInputSize, ioctlOutputPointer, ioctlOutputSize, null, null);
+        immutable status = DeviceIoControl(handle, command, ioctlInputPointer,
+                ioctlInputSize, ioctlOutputPointer, ioctlOutputSize, null, null);
         if (!status)
         {
             immutable errorNumber = GetLastError;
@@ -171,8 +171,7 @@ version (Windows) private
 
     import std.traits : isSomeString, isSomeChar;
 
-    auto isCDDrive(T)(T driveLetter)
-    if (isSomeString!T || isSomeChar!T)
+    auto isCDDrive(T)(T driveLetter) if (isSomeString!T || isSomeChar!T)
     {
         import std.conv : to;
         import std.utf : toUTF16z;
@@ -182,8 +181,12 @@ version (Windows) private
     }
 
     // Select the first optical drive in alphabetical order.
-    @property auto defaultDrive()
+    auto getDefaultDrive()
     {
+        import result : Result;
+
+        alias getDefaultDriveResult = Result!(string, string);
+
         import std.algorithm : find;
         import std.ascii : uppercase;
         import std.utf : byChar;
@@ -191,13 +194,13 @@ version (Windows) private
         auto driveLetters = uppercase.byChar.find!isCDDrive;
         if (driveLetters.empty)
         {
-            return "";
+            return getDefaultDriveResult.err("Not found");
         }
         else
         {
             import std.conv : to;
 
-            return driveLetters.front.to!string;
+            return getDefaultDriveResult.ok(driveLetters.front.to!string);
         }
     }
 
@@ -214,7 +217,7 @@ version (Windows) private
         immutable drivePath = `\\.\` ~ driveLetter ~ ":";
 
         auto handle = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
-            FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
+                FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
 
         return DriveHandle(drivePath, handle);
     }
@@ -223,8 +226,7 @@ version (Windows) private
     in (isValidDriveLetter(driveLetter))
     {
         GET_CONFIGURATION_IOCTL_INPUT ioctlInput = {
-            Feature: FEATURE_NUMBER.FeatureRemovableMedium,
-            RequestType: SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
+            Feature: FEATURE_NUMBER.FeatureRemovableMedium, RequestType: SCSI_GET_CONFIGURATION_REQUEST_TYPE_ONE
         };
 
         return ioctlWrapper(driveLetter, IOCTL_CDROM_GET_CONFIGURATION, &ioctlInput, &response);
@@ -233,26 +235,23 @@ version (Windows) private
 
 version (Windows) package
 {
-    auto getTargetDrive(string driveLetter)
-    out (r; r.name.length > 0 || !r.ok)
+    GetDriveResult getTargetDrive(string drivePathName)
+    out (r)
     {
-        if (driveLetter == "")
-        {
-            immutable defaultDrive_ = defaultDrive;
-            if (defaultDrive_ == "")
-            {
-                logGeneric("No optical drive [A-Z] found");
-                return GetTargetDriveResult(false, "");
-            }
-            else
-            {
-                logGeneric("Target drive: <" ~ defaultDrive_ ~ ">");
-                return GetTargetDriveResult(true, defaultDrive_);
-            }
-        }
+        import result : isErr, isOkAnd;
 
-        logGeneric("Target drive: <" ~ driveLetter ~ ">");
-        return GetTargetDriveResult(true, driveLetter);
+        assert(r.isOkAnd!(t => t.length > 0) || r.isErr);
+    }
+    do
+    {
+        import result : mapErr, inspect, inspectErr;
+
+        immutable getDriveResult = drivePathName == "" ? getDefaultDrive() : GetDriveResult.ok(
+                drivePathName);
+
+        return getDriveResult.mapErr!(_ => "No optical drive [A-Z] found")
+            .inspect!(t => logGeneric("Target drive: <" ~ t ~ ">"))
+            .inspectErr!(e => logGeneric(e));
     }
 
     auto statusImpl(string driveLetter)
@@ -264,18 +263,16 @@ version (Windows) package
         SCSI_PASS_THROUGH_DIRECT ioctlIO = {
             Length: ioctlIOSize, // PathId, TargetId and Lun are "don't-care" params:
                 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff560521%28v=vs.85%29.aspx
-            CdbLength: MechanismStatusCDB.sizeof,
-            DataIn: SCSI_IOCTL_DATA_IN,
-            DataTransferLength: MechanismStatusHeader.sizeof,
-            TimeOutValue: 5,
-            DataBuffer: &mechanismStatusHeader
+            CdbLength: MechanismStatusCDB.sizeof, DataIn: SCSI_IOCTL_DATA_IN, DataTransferLength: MechanismStatusHeader
+                .sizeof, TimeOutValue: 5, DataBuffer: &mechanismStatusHeader
         };
 
         import core.lifetime : emplace;
 
         emplace!MechanismStatusCDB(ioctlIO.Cdb[], mechanismStatusCDB);
 
-        immutable ioctlResult = ioctlWrapper(driveLetter, IOCTL_SCSI_PASS_THROUGH_DIRECT, &ioctlIO, &ioctlIO);
+        immutable ioctlResult = ioctlWrapper(driveLetter,
+                IOCTL_SCSI_PASS_THROUGH_DIRECT, &ioctlIO, &ioctlIO);
 
         if (ioctlResult.ok && ioctlIO.ScsiStatus == 0)
         {
