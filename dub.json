@@ -1,20 +1,28 @@
 {
-	"name": "d-ejector",
-	"description": "A library to just eject CD/DVD/BD drives.",
-	"copyright": "Copyright (C) 2015, electrolysis",
-	"license": "BSL-1.0",
-	"authors": ["electrolysis"],
-	"libs-freebsd": ["cam"],
-	"preBuildCommands-freebsd": ["cd $PACKAGE_DIR/freebsd && cc ccb.c -o ccb && ./ccb > ccb.mixin"],
-	"stringImportPaths-freebsd": ["freebsd"],
-	"targetType": "library",
-	"configurations": [
-		{
-			"name": "default"
-		},
-		{
-			"name": "verbose",
-			"debugVersions": ["VerboseEjector"]
-		}
-	]
+    "name": "d-ejector",
+    "description": "A library to just eject CD/DVD/BD drives.",
+    "copyright": "Copyright (C) 2015, electrolysis",
+    "license": "BSL-1.0",
+    "authors": ["electrolysis"],
+    "dependencies": {
+        "result": {
+            "repository": "git+https://github.com/e10s/result.git",
+            "version": "~main"
+        }
+    },
+    "libs-freebsd": ["cam"],
+    "preBuildCommands-freebsd": [
+        "cd $PACKAGE_DIR/freebsd && cc ccb.c -o ccb && ./ccb > ccb.mixin"
+    ],
+    "stringImportPaths-freebsd": ["freebsd"],
+    "targetType": "library",
+    "configurations": [
+        {
+            "name": "default"
+        },
+        {
+            "name": "verbose",
+            "debugVersions": ["VerboseEjector"]
+        }
+    ]
 }
