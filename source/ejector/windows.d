@@ -99,6 +99,8 @@ version (Windows) private
 
 version (Windows) private
 {
+    import result : Result;
+
     void logError(T...)(lazy string message, uint errorNumber,
             lazy T additionalMessages, string caller = __FUNCTION__)
     {
@@ -119,18 +121,25 @@ version (Windows) private
             Command command, IoctlInput* ioctlInputPointer, IoctlOutput* ioctlOutputPointer)
     in (isValidDriveLetter(driveLetter))
     {
-        auto driveHandle = createDriveHandle(driveLetter);
-        auto handle = driveHandle.handle;
+        auto createDriveHandleResult = createDriveHandle(driveLetter);
+
         scope (exit)
         {
-            handle != INVALID_HANDLE_VALUE && CloseHandle(handle);
+            import result : isOk, unwrap;
+
+            if (createDriveHandleResult.isOk)
+            {
+                CloseHandle(createDriveHandleResult.unwrap);
+            }
         }
 
-        if (handle == INVALID_HANDLE_VALUE)
+        import result : isErr;
+
+        if (createDriveHandleResult.isErr)
         {
-            immutable errorNumber = GetLastError;
-            logError("open failed, " ~ driveHandle.drivePath, errorNumber);
-            return IoctlResult(false, IoctlErrorStage.open, errorNumber);
+            import result : unwrapErr;
+
+            return IoctlResult(false, IoctlErrorStage.open, createDriveHandleResult.unwrapErr);
         }
 
         DWORD ioctlInputSize;
@@ -143,8 +152,12 @@ version (Windows) private
         {
             ioctlOutputSize = IoctlOutput.sizeof;
         }
-        immutable status = DeviceIoControl(handle, command, ioctlInputPointer,
-                ioctlInputSize, ioctlOutputPointer, ioctlOutputSize, null, null);
+
+        import result : unwrap;
+
+        immutable status = DeviceIoControl(createDriveHandleResult.unwrap, command,
+                ioctlInputPointer, ioctlInputSize, ioctlOutputPointer,
+                ioctlOutputSize, null, null);
         if (!status)
         {
             immutable errorNumber = GetLastError;
@@ -183,10 +196,6 @@ version (Windows) private
     // Select the first optical drive in alphabetical order.
     GetDriveResult getDefaultDrive()
     {
-        import result : Result;
-
-        alias getDefaultDriveResult = Result!(string, string);
-
         import std.algorithm : find;
         import std.ascii : uppercase;
         import std.utf : byChar;
@@ -194,22 +203,17 @@ version (Windows) private
         auto driveLetters = uppercase.byChar.find!isCDDrive;
         if (driveLetters.empty)
         {
-            return getDefaultDriveResult.err("Not found");
+            return GetDriveResult.err("Not found");
         }
         else
         {
             import std.conv : to;
 
-            return getDefaultDriveResult.ok(driveLetters.front.to!string);
+            return GetDriveResult.ok(driveLetters.front.to!string);
         }
     }
 
-    import std.traits : ReturnType;
-    import std.typecons : Tuple;
-
-    alias DriveHandle = Tuple!(string, "drivePath", ReturnType!CreateFile, "handle");
-
-    auto createDriveHandle(string driveLetter)
+    Result!(HANDLE, DWORD) createDriveHandle(string driveLetter)
     in (isValidDriveLetter(driveLetter))
     {
         import std.utf : toUTF16z;
@@ -219,7 +223,15 @@ version (Windows) private
         auto handle = CreateFile(drivePath.toUTF16z, GENERIC_READ | GENERIC_WRITE,
                 FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, 0, null);
 
-        return DriveHandle(drivePath, handle);
+        if (handle == INVALID_HANDLE_VALUE)
+        {
+            import result : inspectErr;
+
+            return Result!(HANDLE, DWORD).err(GetLastError())
+                .inspectErr!(e => logError("open failed, " ~ drivePath, e));
+        }
+
+        return Result!(HANDLE, DWORD).ok(handle);
     }
 
     auto getConfiguration(string driveLetter, ref RemovableMediumFeatureResponse response)
