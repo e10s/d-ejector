@@ -139,7 +139,8 @@ version (Windows) private
         {
             import result : unwrapErr;
 
-            return IoctlResult(false, IoctlErrorStage.open, createDriveHandleResult.unwrapErr);
+            return IoctlResult.err(IoctlError(IoctlErrorStage.open,
+                    createDriveHandleResult.unwrapErr));
         }
 
         DWORD ioctlInputSize;
@@ -160,14 +161,15 @@ version (Windows) private
                 ioctlOutputSize, null, null);
         if (!status)
         {
-            immutable errorNumber = GetLastError;
-            logError("ioctl failed, " ~ driveLetter, errorNumber);
-            return IoctlResult(false, IoctlErrorStage.ioctl, errorNumber);
+            import result : inspectErr;
+
+            return IoctlResult.err(IoctlError(IoctlErrorStage.ioctl, GetLastError()))
+                .inspectErr!(e => logError("ioctl failed, " ~ driveLetter, e.errorNumber));
         }
 
-        logGeneric("ioctl succeeded, " ~ driveLetter);
+        import result : inspect;
 
-        return IoctlResult(true, IoctlErrorStage.none, 0);
+        return IoctlResult.ok(status).inspect!(_ => logGeneric("ioctl succeeded, " ~ driveLetter));
     }
 
     IoctlResult ioctlWrapper(Command)(string driveLetter, Command command)
@@ -286,7 +288,9 @@ version (Windows) package
         immutable ioctlResult = ioctlWrapper(driveLetter,
                 IOCTL_SCSI_PASS_THROUGH_DIRECT, &ioctlIO, &ioctlIO);
 
-        if (ioctlResult.ok && ioctlIO.ScsiStatus == 0)
+        import result : isOk;
+
+        if (ioctlResult.isOk && ioctlIO.ScsiStatus == 0)
         {
             return parseStatus(mechanismStatusHeader);
         }
@@ -311,12 +315,16 @@ version (Windows) package
     auto openImpl(string driveLetter)
     in (isValidDriveLetter(driveLetter))
     {
-        return ioctlWrapper(driveLetter, IOCTL_STORAGE_EJECT_MEDIA).ok;
+        import result : isOk;
+
+        return ioctlWrapper(driveLetter, IOCTL_STORAGE_EJECT_MEDIA).isOk;
     }
 
     auto closeImpl(string driveLetter)
     in (isValidDriveLetter(driveLetter))
     {
-        return ioctlWrapper(driveLetter, IOCTL_STORAGE_LOAD_MEDIA).ok;
+        import result : isOk;
+
+        return ioctlWrapper(driveLetter, IOCTL_STORAGE_LOAD_MEDIA).isOk;
     }
 }

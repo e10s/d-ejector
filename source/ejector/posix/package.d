@@ -46,22 +46,24 @@ version (Ejector_Posix) private
 
         if (fileDescriptor == -1)
         {
-            immutable errorNumber = errno;
-            logError("open failed, " ~ drivePathName, errorNumber);
-            return IoctlResult(false, IoctlErrorStage.open, errorNumber);
+            import result : inspectErr;
+
+            return IoctlResult.err(IoctlError(IoctlErrorStage.open, errno))
+                .inspectErr!(e => logError("open failed, " ~ drivePathName, e.errorNumber));
         }
 
         status = ioctl(fileDescriptor, command, third);
         if (status == -1)
         {
-            immutable errorNumber = errno;
-            logError("ioctl failed, " ~ drivePathName, errorNumber);
-            return IoctlResult(false, IoctlErrorStage.ioctl, errorNumber);
+            import result : inspectErr;
+
+            return IoctlResult.err(IoctlError(IoctlErrorStage.ioctl, errno))
+                .inspectErr!(e => logError("ioctl failed, " ~ drivePathName, e.errorNumber));
         }
 
-        logGeneric("ioctl succeeded, " ~ drivePathName);
+        import result : inspect;
 
-        return IoctlResult(true, IoctlErrorStage.none, 0);
+        return IoctlResult.ok(status).inspect!(_ => logGeneric("ioctl succeeded, " ~ drivePathName));
     }
 
     IoctlResult ioctlWrapper(Command)(string drivePathName, Command command, ref int status)

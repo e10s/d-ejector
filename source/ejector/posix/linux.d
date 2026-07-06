@@ -16,14 +16,8 @@ version (linux) package(ejector.posix) mixin template LinuxImpl()
         in (drivePathName.length > 0)
         {
             sg_io_hdr header = {
-                interface_id: SG_INTERFACE_ID_ORIG,
-                dxfer_direction: SG_DXFER_FROM_DEV,
-                cmd_len: GetConfigurationCDB.sizeof,
-                dxfer_len: RemovableMediumFeatureResponse.sizeof,
-                dxferp: &response,
-                cmdp: cast(ubyte*)&getConfigurationCDB,
-                sbp: null,
-                timeout: 5000
+                interface_id: SG_INTERFACE_ID_ORIG, dxfer_direction: SG_DXFER_FROM_DEV, cmd_len: GetConfigurationCDB.sizeof, dxfer_len: RemovableMediumFeatureResponse.sizeof, dxferp: &response,
+                cmdp: cast(ubyte*)&getConfigurationCDB, sbp: null, timeout: 5000
             };
 
             int status;
@@ -38,10 +32,11 @@ version (linux) package(ejector.posix) mixin template LinuxImpl()
         {
             int status = -1;
             immutable ioctlResult = ioctlWrapper(drivePathName, CDROM_DRIVE_STATUS, status);
-            if (ioctlResult.ok && status != CDS_NO_INFO)
+            import result : isOk;
+
+            if (ioctlResult.isOk && status != CDS_NO_INFO)
             {
-                return status == CDS_TRAY_OPEN ?
-                    TrayStatus.OPEN : TrayStatus.CLOSED;
+                return status == CDS_TRAY_OPEN ? TrayStatus.OPEN : TrayStatus.CLOSED;
             }
             else
             {
@@ -64,13 +59,17 @@ version (linux) package(ejector.posix) mixin template LinuxImpl()
         auto openImpl(string drivePathName)
         in (drivePathName.length > 0)
         {
-            return ioctlWrapper(drivePathName, CDROMEJECT).ok;
+            import result : isOk;
+
+            return ioctlWrapper(drivePathName, CDROMEJECT).isOk;
         }
 
         auto closeImpl(string drivePathName)
         in (drivePathName.length > 0)
         {
-            return ioctlWrapper(drivePathName, CDROMCLOSETRAY).ok;
+            import result : isOk;
+
+            return ioctlWrapper(drivePathName, CDROMCLOSETRAY).isOk;
         }
     }
 }

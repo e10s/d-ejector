@@ -17,7 +17,8 @@ import std.typecons : Tuple;
 import result : Result;
 
 package alias GetDriveResult = Result!(string, string);
-package alias IoctlResult = Tuple!(bool, "ok", IoctlErrorStage, "stage", int, "errorNumber");
+package alias IoctlError = Tuple!(IoctlErrorStage, "stage", int, "errorNumber");
+package alias IoctlResult = Result!(int, IoctlError);
 
 package void logGeneric(T...)(lazy string message, lazy T additionalMessages,
         string caller = __FUNCTION__)
@@ -132,8 +133,9 @@ package bool ejectableClosableCommon(alias getConfigurationFunction)(
 {
     auto response = RemovableMediumFeatureResponse();
     immutable ioctlResult = getConfigurationFunction(driveName, response);
+    import result : isErr;
 
-    if (!ioctlResult.ok)
+    if (ioctlResult.isErr)
     {
         // We might have to execute MODE SENSE (10)
         return false;

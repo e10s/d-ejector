@@ -36,8 +36,7 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
         union ccb;
         struct ccb_scsiio;
 
-        extern (C) int csio_build(ccb_scsiio*, ubyte*, uint, uint, int, int,
-            const(char)*, ...);
+        extern (C) int csio_build(ccb_scsiio*, ubyte*, uint, uint, int, int, const(char)*, ...);
 
         // camlib.h
         // https://github.com/freebsd/freebsd/blob/master/lib/libcam/camlib.h
@@ -54,8 +53,8 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
         enum IOCPARM_SHIFT = 13;
         enum IOCPARM_MASK = (1 << IOCPARM_SHIFT) - 1;
         enum IOC_VOID = 0x20000000;
-        enum _IOC(uint inout_, uint group, uint num, uint len) =
-            uint(inout_ | ((len & IOCPARM_MASK) << 16) | (group << 8) | num);
+        enum _IOC(uint inout_, uint group, uint num, uint len) = uint(
+                    inout_ | ((len & IOCPARM_MASK) << 16) | (group << 8) | num);
         enum _IO(uint g, uint n) = _IOC!(IOC_VOID, g, n, 0);
 
         // sys/cdio.h
@@ -83,14 +82,16 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
 
             if (!camDevice)
             {
-                logGeneric("cam_open_device failed, " ~ drivePathName, cast(string) cam_errbuf);
-                return IoctlResult(false, IoctlErrorStage.open, 0);
+                import result : inspectErr;
+
+                return IoctlResult.err(IoctlError(IoctlErrorStage.open, 0))
+                    .inspectErr!(_ => logGeneric("cam_open_device failed, " ~ drivePathName,
+                            cast(string) cam_errbuf));
             }
 
             ubyte[CCB_SIZE] ccbLike; // substitute for union ccb
             csio_build(cast(ccb_scsiio*) ccbLike.ptr, cast(ubyte*)&response,
-                uint(Response.sizeof), ccb_flags.CAM_DIR_IN,
-                1, 5000, "".toStringz);
+                    uint(Response.sizeof), ccb_flags.CAM_DIR_IN, 1, 5000, "".toStringz);
             ccbLike[CCB_CDB_LEN_OFFSET] = ubyte(CDB.sizeof);
             import core.lifetime : emplace;
 
@@ -100,14 +101,17 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
             immutable status = cam_send_ccb(camDevice, cast(ccb*) ccbLike.ptr);
             if (status == -1)
             {
-                immutable errorNumber = errno;
-                logError("cam_send_ccb failed, " ~ drivePathName, errorNumber, cast(string) cam_errbuf);
-                return IoctlResult(false, IoctlErrorStage.ioctl, errorNumber);
+                import result : inspectErr;
+
+                return IoctlResult.err(IoctlError(IoctlErrorStage.ioctl, errno))
+                    .inspectErr!(e => logError("cam_send_ccb failed, " ~ drivePathName,
+                            e.errorNumber, cast(string) cam_errbuf));
             }
 
-            logGeneric("cam_send_ccb succeeded, " ~ drivePathName);
+            import result : inspect;
 
-            return IoctlResult(true, IoctlErrorStage.none, 0);
+            return IoctlResult.ok(status)
+                .inspect!(_ => logGeneric("cam_send_ccb succeeded, " ~ drivePathName));
         }
 
         immutable cdDrivePrefix = "cd";
@@ -125,9 +129,11 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
         in (drivePathName.length > 0)
         {
             auto mechanismStatusHeader = MechanismStatusHeader();
-            immutable ioctlResult = camCommander(drivePathName, mechanismStatusCDB, mechanismStatusHeader);
+            immutable ioctlResult = camCommander(drivePathName,
+                    mechanismStatusCDB, mechanismStatusHeader);
+            import result : isOk;
 
-            if (ioctlResult.ok)
+            if (ioctlResult.isOk)
             {
                 return parseStatus(mechanismStatusHeader);
             }
@@ -152,13 +158,17 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
         auto openImpl(string drivePathName)
         in (drivePathName.length > 0)
         {
-            return ioctlWrapper(drivePathName, Command.CDIOCEJECT).ok;
+            import result : isOk;
+
+            return ioctlWrapper(drivePathName, Command.CDIOCEJECT).isOk;
         }
 
         auto closeImpl(string drivePathName)
         in (drivePathName.length > 0)
         {
-            return ioctlWrapper(drivePathName, Command.CDIOCCLOSE).ok;
+            import result : isOk;
+
+            return ioctlWrapper(drivePathName, Command.CDIOCCLOSE).isOk;
         }
     }
 }
