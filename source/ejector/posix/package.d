@@ -81,7 +81,7 @@ version (Ejector_Posix) private
         ],
     };
 
-    auto getDefaultDrive()
+    GetDriveResult getDefaultDrive()
     {
         import std.file : exists;
         import std.path : buildPath;

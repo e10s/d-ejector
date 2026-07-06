@@ -181,7 +181,7 @@ version (Windows) private
     }
 
     // Select the first optical drive in alphabetical order.
-    auto getDefaultDrive()
+    GetDriveResult getDefaultDrive()
     {
         import result : Result;
 
