@@ -62,17 +62,11 @@ struct Ejector
     }
 
     ///
-    @property auto status() const
+    @property GetStatusResult status() const
     {
-        import result : isErr, unwrap;
+        import result : andThen;
 
-        immutable targetDrive = getTargetDrive(drive);
-        if (targetDrive.isErr)
-        {
-            return TrayStatus.ERROR;
-        }
-
-        return statusImpl(targetDrive.unwrap);
+        return getTargetDrive(drive).andThen!statusImpl;
     }
     ///
     @property auto ejectable() const

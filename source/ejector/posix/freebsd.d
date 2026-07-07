@@ -125,22 +125,18 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
 
     package(ejector)
     {
-        auto statusImpl(string drivePathName)
+        GetStatusResult statusImpl(string drivePathName)
         in (drivePathName.length > 0)
         {
-            auto mechanismStatusHeader = MechanismStatusHeader();
-            immutable ioctlResult = camCommander(drivePathName,
-                    mechanismStatusCDB, mechanismStatusHeader);
-            import result : isOk;
+            import result : map, mapErr;
+            import std.conv : to;
 
-            if (ioctlResult.isOk)
-            {
-                return parseStatus(mechanismStatusHeader);
-            }
-            else
-            {
-                return TrayStatus.ERROR;
-            }
+            auto mechanismStatusHeader = MechanismStatusHeader();
+
+            return camCommander(drivePathName, mechanismStatusCDB, mechanismStatusHeader).mapErr!(
+                    e => e.to!string) // FIXME: Good format
+            .map!(_ => parseStatus(mechanismStatusHeader));
+
         }
 
         auto ejectableImpl(string drivePathName)

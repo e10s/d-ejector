@@ -13,13 +13,18 @@ void testDrive(ref Ejector e)
     writeln("Ejectable?: ", e.ejectable);
     writeln("Closable?: ", e.closable);
 
-    immutable status = e.status;
-    writeln("Current status: ", status);
+    immutable statusResult = e.status;
 
-    if (status == TrayStatus.ERROR)
+    import result : isErr, unwrap;
+
+    if (statusResult.isErr)
     {
+        writeln("Failed to get current status.");
         return;
     }
+
+    immutable status = statusResult.unwrap;
+    writeln("Current status: ", status);
 
     // Try to toggle the drive open/closed.
     if (status == TrayStatus.OPEN)
@@ -33,7 +38,15 @@ void testDrive(ref Ejector e)
         writeln("Tried to open the drive... ", result);
     }
 
-    writeln("New status: ", e.status);
+    immutable newStatusResult = e.status;
+
+    if (newStatusResult.isErr)
+    {
+        writeln("Failed to get new status.");
+        return;
+    }
+
+    writeln("New status: ", newStatusResult.unwrap);
 }
 
 void main()
@@ -41,13 +54,15 @@ void main()
     version (linux)
     {
         auto targets = [
-            "/dev/sr0", "/dev/sr1", "/dev/null", "/../root", "/no/such/device", "what about this/../how about this?"
+            "/dev/sr0", "/dev/sr1", "/dev/null", "/../root", "/no/such/device",
+            "what about this/../how about this?"
         ];
     }
     version (FreeBSD)
     {
         auto targets = [
-            "/dev/cd0", "/dev/cd1", "/dev/null", "/../root", "/no/such/device", "what about this/../how about this?"
+            "/dev/cd0", "/dev/cd1", "/dev/null", "/../root", "/no/such/device",
+            "what about this/../how about this?"
         ];
     }
     version (Windows)
@@ -75,7 +90,8 @@ void main()
 
         auto ejector = Ejector(drive);
 
-        immutable info = tuple!("Ejectable", "Closable", "Status")(ejector.ejectable, ejector.closable, ejector.status);
+        immutable info = tuple!("Ejectable", "Closable", "Status")(ejector.ejectable,
+                ejector.closable, ejector.status);
         writeln(info);
 
     }

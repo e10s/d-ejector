@@ -17,6 +17,7 @@ import std.typecons : Tuple;
 import result : Result;
 
 package alias GetDriveResult = Result!(string, string);
+package alias GetStatusResult = Result!(TrayStatus, string);
 package alias IoctlError = Tuple!(IoctlErrorStage, "stage", int, "errorNumber");
 package alias IoctlResult = Result!(int, IoctlError);
 
@@ -38,7 +39,6 @@ package void logGeneric(T...)(lazy string message, lazy T additionalMessages,
 
 enum TrayStatus
 {
-    ERROR,
     OPEN,
     CLOSED
 }

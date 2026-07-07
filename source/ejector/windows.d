@@ -268,7 +268,7 @@ version (Windows) package
             .inspectErr!(e => logGeneric(e));
     }
 
-    auto statusImpl(string driveLetter)
+    GetStatusResult statusImpl(string driveLetter)
     in (isValidDriveLetter(driveLetter))
     {
         enum ioctlIOSize = USHORT(SCSI_PASS_THROUGH_DIRECT.sizeof);
@@ -285,19 +285,16 @@ version (Windows) package
 
         emplace!MechanismStatusCDB(ioctlIO.Cdb[], mechanismStatusCDB);
 
-        immutable ioctlResult = ioctlWrapper(driveLetter,
-                IOCTL_SCSI_PASS_THROUGH_DIRECT, &ioctlIO, &ioctlIO);
+        import result : mapErr, andThen;
+        import std.conv : to;
+        import std.format : format;
 
-        import result : isOk;
-
-        if (ioctlResult.isOk && ioctlIO.ScsiStatus == 0)
-        {
-            return parseStatus(mechanismStatusHeader);
-        }
-        else
-        {
-            return TrayStatus.ERROR;
-        }
+        return ioctlWrapper(driveLetter, IOCTL_SCSI_PASS_THROUGH_DIRECT, &ioctlIO, &ioctlIO).mapErr!(
+                e => e.to!string) // FIXME: Good format
+        .andThen!(_ => ioctlIO.ScsiStatus == 0
+                    ? GetStatusResult.ok(parseStatus(mechanismStatusHeader)) : GetStatusResult.err(
+                        format("Failed to get tray status from Mechanism Status Header. ScsiStatus: %s",
+                        ioctlIO.ScsiStatus)));
     }
 
     auto ejectableImpl(string driveLetter)

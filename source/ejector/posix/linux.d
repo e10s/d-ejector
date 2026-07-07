@@ -27,21 +27,18 @@ version (linux) package(ejector.posix) mixin template LinuxImpl()
 
     package(ejector)
     {
-        auto statusImpl(string drivePathName)
+        GetStatusResult statusImpl(string drivePathName)
         in (drivePathName.length > 0)
         {
-            int status = -1;
-            immutable ioctlResult = ioctlWrapper(drivePathName, CDROM_DRIVE_STATUS, status);
-            import result : isOk;
+            import result : mapErr, andThen;
+            import std.conv : to;
 
-            if (ioctlResult.isOk && status != CDS_NO_INFO)
-            {
-                return status == CDS_TRAY_OPEN ? TrayStatus.OPEN : TrayStatus.CLOSED;
-            }
-            else
-            {
-                return TrayStatus.ERROR;
-            }
+            int status = -1;
+            return ioctlWrapper(drivePathName, CDROM_DRIVE_STATUS, status).mapErr!(
+                    e => e.to!string) // FIXME: Good format
+            .andThen!(t => t != CDS_NO_INFO ? GetStatusResult.ok(t == CDS_TRAY_OPEN ? TrayStatus.OPEN
+                        : TrayStatus.CLOSED) : GetStatusResult.err(
+                        "Failed to get tray status. CDS_NO_INFO is returned."));
         }
 
         auto ejectableImpl(string drivePathName)
