@@ -18,6 +18,14 @@ version (FreeBSD)
 
 version (Ejector_Posix) private
 {
+    string errorNumberToString(int errorNumber)
+    {
+        import core.stdc.string : strerror;
+        import std.conv : to;
+
+        return errorNumber.strerror.to!string;
+    }
+
     void logError(T...)(lazy string message, int errorNumber,
             lazy T additionalMessages, string caller = __FUNCTION__)
     {
@@ -26,7 +34,7 @@ version (Ejector_Posix) private
             import core.stdc.string : strerror;
             import std.conv : text;
 
-            logGeneric!T(message ~ ": " ~ errorNumber.strerror.text, additionalMessages, caller);
+            logGeneric!T(message ~ ": " ~ errorNumberToString(errorNumber), additionalMessages, caller);
         }
     }
 

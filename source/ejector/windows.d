@@ -101,19 +101,25 @@ version (Windows) private
 {
     import result : Result;
 
+    string errorNumberToString(uint errorNumber)
+    {
+        import std.conv : to;
+        import std.string : chomp;
+
+        char[512] buffer;
+        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, null, errorNumber,
+                MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer.ptr, buffer.length, null);
+
+        return buffer.ptr.to!string.chomp;
+    }
+
     void logError(T...)(lazy string message, uint errorNumber,
             lazy T additionalMessages, string caller = __FUNCTION__)
     {
         debug (VerboseEjector)
         {
-            import std.conv : text;
-            import std.string : chomp;
-
-            char[512] buffer;
-            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, null, errorNumber,
-                    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer.ptr, buffer.length, null);
-
-            logGeneric!T(message ~ ": " ~ buffer.ptr.text.chomp, additionalMessages, caller);
+            logGeneric!T(message ~ ": " ~ errorNumberToString(errorNumber),
+                    additionalMessages, caller);
         }
     }
 
