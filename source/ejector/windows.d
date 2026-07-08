@@ -127,55 +127,42 @@ version (Windows) private
             Command command, IoctlInput* ioctlInputPointer, IoctlOutput* ioctlOutputPointer)
     in (isValidDriveLetter(driveLetter))
     {
-        auto createDriveHandleResult = createDriveHandle(driveLetter);
-
-        scope (exit)
+        auto impl(HANDLE handle)
         {
-            import result : isOk, unwrap;
-
-            if (createDriveHandleResult.isOk)
+            scope (exit)
             {
-                CloseHandle(createDriveHandleResult.unwrap);
+                CloseHandle(handle);
             }
+
+            DWORD ioctlInputSize;
+            DWORD ioctlOutputSize;
+            if (ioctlInputPointer !is null)
+            {
+                ioctlInputSize = IoctlInput.sizeof;
+            }
+            if (ioctlOutputPointer !is null)
+            {
+                ioctlOutputSize = IoctlOutput.sizeof;
+            }
+
+            immutable status = DeviceIoControl(handle, command, ioctlInputPointer,
+                    ioctlInputSize, ioctlOutputPointer, ioctlOutputSize, null, null);
+            if (!status)
+            {
+                import result : inspectErr;
+
+                return IoctlResult.err(IoctlError(IoctlErrorStage.ioctl, GetLastError()))
+                    .inspectErr!(e => logError("ioctl failed, " ~ driveLetter, e.errorNumber));
+            }
+
+            return IoctlResult.ok(status);
         }
 
-        import result : isErr;
+        import result : andThen, inspect, mapErr;
 
-        if (createDriveHandleResult.isErr)
-        {
-            import result : unwrapErr;
-
-            return IoctlResult.err(IoctlError(IoctlErrorStage.open,
-                    createDriveHandleResult.unwrapErr));
-        }
-
-        DWORD ioctlInputSize;
-        DWORD ioctlOutputSize;
-        if (ioctlInputPointer !is null)
-        {
-            ioctlInputSize = IoctlInput.sizeof;
-        }
-        if (ioctlOutputPointer !is null)
-        {
-            ioctlOutputSize = IoctlOutput.sizeof;
-        }
-
-        import result : unwrap;
-
-        immutable status = DeviceIoControl(createDriveHandleResult.unwrap, command,
-                ioctlInputPointer, ioctlInputSize, ioctlOutputPointer,
-                ioctlOutputSize, null, null);
-        if (!status)
-        {
-            import result : inspectErr;
-
-            return IoctlResult.err(IoctlError(IoctlErrorStage.ioctl, GetLastError()))
-                .inspectErr!(e => logError("ioctl failed, " ~ driveLetter, e.errorNumber));
-        }
-
-        import result : inspect;
-
-        return IoctlResult.ok(status).inspect!(_ => logGeneric("ioctl succeeded, " ~ driveLetter));
+        return createDriveHandle(driveLetter).mapErr!(e => IoctlError(IoctlErrorStage.open, e))
+            .andThen!(t => impl(cast(HANDLE) t))
+            .inspect!(_ => logGeneric("ioctl succeeded, " ~ driveLetter));
     }
 
     IoctlResult ioctlWrapper(Command)(string driveLetter, Command command)
@@ -242,7 +229,7 @@ version (Windows) private
         return Result!(HANDLE, DWORD).ok(handle);
     }
 
-    auto getConfiguration(string driveLetter, ref RemovableMediumFeatureResponse response)
+    IoctlResult getConfiguration(string driveLetter, ref RemovableMediumFeatureResponse response)
     in (isValidDriveLetter(driveLetter))
     {
         GET_CONFIGURATION_IOCTL_INPUT ioctlInput = {

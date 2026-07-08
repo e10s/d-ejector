@@ -68,55 +68,72 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
 
     package(ejector.posix)
     {
-        auto camCommander(CDB, Response)(string drivePathName, CDB cdb, ref Response response)
+        import result : Result;
+
+        Result!(cam_device*, int) camOpenDevice(string drivePathName)
         in (drivePathName.length > 0)
         {
-            import core.stdc.errno : errno;
             import core.sys.posix.fcntl : O_RDWR;
             import std.string : toStringz;
 
             cam_errbuf[] = 0;
             auto camDevice = cam_open_device(drivePathName.toStringz, O_RDWR);
-            scope (exit)
-                camDevice && cam_close_device(camDevice);
 
-            if (!camDevice)
+            if (camDevice is null)
             {
                 import result : inspectErr;
 
-                return IoctlResult.err(IoctlError(IoctlErrorStage.open, 0))
+                return Result!(cam_device*, int).err(0)
                     .inspectErr!(_ => logGeneric("cam_open_device failed, " ~ drivePathName,
                             cast(string) cam_errbuf));
             }
 
-            ubyte[CCB_SIZE] ccbLike; // substitute for union ccb
-            csio_build(cast(ccb_scsiio*) ccbLike.ptr, cast(ubyte*)&response,
-                    uint(Response.sizeof), ccb_flags.CAM_DIR_IN, 1, 5000, "".toStringz);
-            ccbLike[CCB_CDB_LEN_OFFSET] = ubyte(CDB.sizeof);
-            import core.lifetime : emplace;
+            return Result!(cam_device*, int).ok(camDevice);
+        }
 
-            emplace!CDB(ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + CDB.sizeof], cdb);
-
-            cam_errbuf[] = 0;
-            immutable status = cam_send_ccb(camDevice, cast(ccb*) ccbLike.ptr);
-            if (status == -1)
+        IoctlResult camCommander(CDB, Response)(string drivePathName, CDB cdb, ref Response response)
+        in (drivePathName.length > 0)
+        {
+            auto impl(cam_device* camDevice)
             {
-                import result : inspectErr;
+                scope (exit)
+                {
+                    cam_close_device(camDevice);
+                }
+                import std.string : toStringz;
 
-                return IoctlResult.err(IoctlError(IoctlErrorStage.ioctl, errno))
-                    .inspectErr!(e => logError("cam_send_ccb failed, " ~ drivePathName,
-                            e.errorNumber, cast(string) cam_errbuf));
+                ubyte[CCB_SIZE] ccbLike; // substitute for union ccb
+                csio_build(cast(ccb_scsiio*) ccbLike.ptr, cast(ubyte*)&response,
+                        uint(Response.sizeof), ccb_flags.CAM_DIR_IN, 1, 5000, "".toStringz);
+                ccbLike[CCB_CDB_LEN_OFFSET] = ubyte(CDB.sizeof);
+                import core.lifetime : emplace;
+
+                emplace!CDB(ccbLike[CCB_CDB_BYTES_OFFSET .. CCB_CDB_BYTES_OFFSET + CDB.sizeof], cdb);
+                cam_errbuf[] = 0;
+                auto status = cam_send_ccb(camDevice, cast(ccb*) ccbLike.ptr);
+                if (status == -1)
+                {
+                    import core.stdc.errno : errno;
+                    import result : inspectErr;
+
+                    return IoctlResult.err(IoctlError(IoctlErrorStage.ioctl, errno))
+                        .inspectErr!(e => logError("cam_send_ccb failed, " ~ drivePathName,
+                                e.errorNumber, cast(string) cam_errbuf));
+                }
+
+                return IoctlResult.ok(status);
             }
 
-            import result : inspect;
+            import result : andThen, inspect, mapErr;
 
-            return IoctlResult.ok(status)
+            return camOpenDevice(drivePathName).mapErr!(e => IoctlError(IoctlErrorStage.open, e))
+                .andThen!(t => impl(cast(cam_device*) t))
                 .inspect!(_ => logGeneric("cam_send_ccb succeeded, " ~ drivePathName));
         }
 
         immutable cdDrivePrefix = "cd";
-
-        auto getConfiguration(string drivePathName, ref RemovableMediumFeatureResponse response)
+        IoctlResult getConfiguration(string drivePathName,
+                ref RemovableMediumFeatureResponse response)
         in (drivePathName.length > 0)
         {
             return camCommander(drivePathName, getConfigurationCDB, response);
@@ -132,11 +149,9 @@ version (FreeBSD) package(ejector.posix) mixin template FreeBSDImpl()
             import std.conv : to;
 
             auto mechanismStatusHeader = MechanismStatusHeader();
-
             return camCommander(drivePathName, mechanismStatusCDB, mechanismStatusHeader).mapErr!(
                     e => e.to!string) // FIXME: Good format
             .map!(_ => parseStatus(mechanismStatusHeader));
-
         }
 
         auto ejectableImpl(string drivePathName)

@@ -34,55 +34,71 @@ version (Ejector_Posix) private
             import core.stdc.string : strerror;
             import std.conv : text;
 
-            logGeneric!T(message ~ ": " ~ errorNumberToString(errorNumber), additionalMessages, caller);
+            logGeneric!T(message ~ ": " ~ errorNumberToString(errorNumber),
+                    additionalMessages, caller);
         }
     }
 
-    IoctlResult ioctlWrapper(Command, T)(string drivePathName, Command command,
-            ref int status, T third)
+    import result : Result;
+
+    Result!(int, int) createFileDescriptor(string drivePathName)
     in (drivePathName.length > 0)
     {
         import core.stdc.errno : errno;
         import core.sys.posix.fcntl : O_NONBLOCK, O_RDONLY, open;
-        import core.sys.posix.sys.ioctl : ioctl;
-        import core.sys.posix.unistd : close;
         import std.string : toStringz;
 
-        immutable fileDescriptor = open(drivePathName.toStringz, O_NONBLOCK | O_RDONLY);
-        scope (exit)
-            fileDescriptor != -1 && close(fileDescriptor);
+        auto fileDescriptor = open(drivePathName.toStringz, O_NONBLOCK | O_RDONLY);
 
         if (fileDescriptor == -1)
         {
             import result : inspectErr;
 
-            return IoctlResult.err(IoctlError(IoctlErrorStage.open, errno))
-                .inspectErr!(e => logError("open failed, " ~ drivePathName, e.errorNumber));
+            return Result!(int, int).err(errno)
+                .inspectErr!(e => logError("open failed, " ~ drivePathName, e));
         }
 
-        status = ioctl(fileDescriptor, command, third);
-        if (status == -1)
-        {
-            import result : inspectErr;
-
-            return IoctlResult.err(IoctlError(IoctlErrorStage.ioctl, errno))
-                .inspectErr!(e => logError("ioctl failed, " ~ drivePathName, e.errorNumber));
-        }
-
-        import result : inspect;
-
-        return IoctlResult.ok(status).inspect!(_ => logGeneric("ioctl succeeded, " ~ drivePathName));
+        return Result!(int, int).ok(fileDescriptor);
     }
 
-    IoctlResult ioctlWrapper(Command)(string drivePathName, Command command, ref int status)
+    IoctlResult ioctlWrapper(Command, T)(string drivePathName, Command command, T third)
+    in (drivePathName.length > 0)
     {
-        return ioctlWrapper(drivePathName, command, status, 0);
+        auto impl(int fileDescriptor)
+        {
+            scope (exit)
+            {
+                import core.sys.posix.unistd : close;
+
+                close(fileDescriptor);
+            }
+
+            import core.sys.posix.sys.ioctl : ioctl;
+
+            auto status = ioctl(fileDescriptor, command, third);
+            if (status == -1)
+            {
+                import core.stdc.errno : errno;
+                import result : inspectErr;
+
+                return IoctlResult.err(IoctlError(IoctlErrorStage.ioctl, errno))
+                    .inspectErr!(e => logError("ioctl failed, " ~ drivePathName, e.errorNumber));
+            }
+
+            return IoctlResult.ok(status);
+        }
+
+        import result : andThen, inspect, mapErr;
+
+        return createFileDescriptor(drivePathName).mapErr!(
+                e => IoctlError(IoctlErrorStage.open, e))
+            .andThen!impl
+            .inspect!(_ => logGeneric("ioctl succeeded, " ~ drivePathName));
     }
 
     IoctlResult ioctlWrapper(Command)(string drivePathName, Command command)
     {
-        int status;
-        return ioctlWrapper(drivePathName, command, status);
+        return ioctlWrapper(drivePathName, command, 0);
     }
 
     static immutable GetConfigurationCDB getConfigurationCDB = {
